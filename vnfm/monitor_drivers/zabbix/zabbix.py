@@ -28,8 +28,32 @@ OPTS = [
 ]
 cfg.CONF.register_opts(OPTS, 'zabbix')
 
-AUTHINFO = {'jsonrpc':"2.0",'method':"user.login",'params':{'user':"Admin",'password':"zabbix"},'id':1,'auth':"null"}
-URL = 'http://220.70.2.143:7778/zabbix'
+AUTHINFO = {'jsonrpc':"2.0",'method':"user.login",'params':{'user':"Admin",'password':"zabbix"},'id':1,'auth':None}
+ADDINFO = {'jsonrpc':"2.0",'method':"",'params':{'host':'ubuntu',
+                     'interfaces':[{'type':1,'main':1,'useip':1,'dns':"",'ip':None,'port':"10050"}],
+                      'templates':[{'templateid':None},{'templateid':None}],'groups':[{'groupid':None}]},'id':4,'auth':None}
+# ADDINFO = {'jsonrpc':"2.0",'method':"",'params':{'host':'ubuntu','interfaces':[{'ip':None,'port':"10050"}]
+#                                                  ,'groups':[{'groupid':None}]},'id':452,'auth':None}
+
+GROUPINFO = {'jsonrpc':"2.0",'method':"hostgroup.get",'params':{'output':'extend','filter':{'name':["Zabbix servers",]}},'id':1109,'auth':None}
+
+TEMPINFO = {'jsonrpc':"2.0",'method':"template.get",'params':{'output':'extend',
+            'filter':{'host':["Template App Apache Web Server zapache",
+            "Template App Zabbix Agent"]}},'id':1109,'auth':None}
+
+ACTIONINFO = {'jsonrpc':"2.0",'method':"action.create",
+              'params':{'name':'Trigger action','eventsource':0,'status':0,'esc_period':120,'def_shortdata':"{TRIGGER.NAME}:{TRIGGER.STATUS}",
+                        'def_longdata':"{TRIGGER.NAME}: {TRIGGER.STATUS}\r\nLast value: {ITEM.LASTVALUE]\r\n\r\n{TRIGGER.URL}",
+                        "filter":{"evaltype":0,"conditions":[{'conditiontype':1,'operator':0,'value':None}]},'operations':[{'operationtype':1,
+                            'esc_period':0,'esc_step_from':1,'esc_step_to':2,'evaltype':0,'opcommand':"service apache2 restart",'opcommand_hst':None
+
+                            }]
+                        }}
+
+
+
+
+URL = 'http://192.168.11.51:80/zabbix/api_jsonrpc.php'
 HEADERS={'Content-Type':'application/json-rpc'}
 
 
@@ -76,34 +100,108 @@ class VNFMonitorZabbix(extensions.PluginInterface):
 
         pass
 
-    def create_api(self,kwargs):
+
+    def add_trigger_action(self):
         pass
 
 
+
+    def add_host_create_api(self,kwargs,token):
+        info = ADDINFO
+        ginfo = GROUPINFO
+        tinfo = TEMPINFO
+        ainfo = ACTIONINFO
+        info['method'] ='host.create'
+        tinfo['auth']=token
+        ginfo['auth'] = token
+        info['auth'] =str(token)
+        print("kwargs", kwargs.keys())
+
+        print("###################################################")
+        print("###################################################")
+        ######################################we Sholud change this code ###########################################
+        ######################################we Sholud change this code ###########################################
+        ######################################we Sholud change this code ###########################################
+        ######################################we Sholud change this code ###########################################
+        ######################################we Sholud change this code ###########################################
+
+        response = requests.post(URL, headers=HEADERS, data=json.dumps(ginfo))
+        response_dict = dict(response.json())
+
+
+###############ALL REQUEST one FUNCIO
+
+        #
+        # if 'apache2' == kwargs['vdus']['VDU1']['parameters']['servicename']:
+        #     info['params']['templates'][0]['host'] = 'Template App Apache Web Server zapache'
+        print("rrrrrrrrrrr", response_dict.keys())
+
+
+
+        info['params']['interfaces'][0]['ip'] = kwargs['vdus']['VDU1']['mgmt_ip']
+        info['params']['groups'][0]['groupid'] = response_dict['result'][0]['groupid']
+
+        response = requests.post(URL, headers=HEADERS, data=json.dumps(tinfo))
+        response_dict = dict(response.json())
+
+        info['params']['templates'][0]['templateid'] = str(response_dict['result'][0]['templateid'])
+        info['params']['templates'][1]['templateid'] = str(response_dict['result'][1]['templateid'])
+
+
+        print("###################################################")
+        print("###################################################")
+        print("###################################################")
+        print("Line 97 add_host_create_api in zabbix.py")
+        print("info : ", info)
+        print("kwargs",kwargs)
+
+        print("###################################################")
+        print("###################################################")
+        print("###################################################")
+
+        # response = requests.post(URL, headers=HEADERS, data=json.dumps(info))
+        response = requests.post(URL,headers=HEADERS,data=json.dumps(info))
+
+        response_dict = dict(response.json())
+        print("response_dict", response_dict)
+        print("response_dict", response_dict['result']['hostids'])
+        host_id = response_dict['result']['hostids']
+        ainfo['params']['operations']['opcommand_hst'] = str(host_id)
+
+
+
+
+
+
     def connect_to_server(self):
-        # reponse = requests.get(URL,headers=HEADERS,data=json.dumps(AUTHINFO))
-        reponse = requests.get(URL)
+        # reponse = requests.post(URL,headers=HEADERS,data=json.dumps(INFO))
+        response = requests.post(URL, headers=HEADERS, data=json.dumps(AUTHINFO))
+        response_dict = dict(response.json())
 
         print("###################################################")
         print("###################################################")
         print("###################################################")
         print("Line 87 conntect_to_server in zabbix.py")
-        print("repose : ",reponse)
+        print("repose : ", response.status_code)
+        print("repose.token: ",response_dict['result'])
+        print("repose.token: ", type(response_dict))
         print("###################################################")
         print("###################################################")
         print("###################################################")
+        return response.status_code,response_dict['result']
 
 
 
 
 
     def add_to_svcmonitor(self, vnf, kwargs):
-        self.connect_to_server()
+        status_code,token = self.connect_to_server()
+        self.add_host_create_api(kwargs,token)
+
         print("###################################################")
         print("###################################################")
         print("###################################################")
-        print("Line 76 add_to_zabbix in zabbix.py")
-        print("kwargs : ",kwargs)
+        print("Line 141 add_to_svcmonitot in zabbix.py")
         print("###################################################")
         print("###################################################")
         print("###################################################")
