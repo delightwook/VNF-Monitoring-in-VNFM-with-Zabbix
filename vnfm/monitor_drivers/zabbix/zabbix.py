@@ -35,23 +35,28 @@ ADDINFO = {'jsonrpc':"2.0",'method':"",'params':{'host':'ubuntu',
 # ADDINFO = {'jsonrpc':"2.0",'method':"",'params':{'host':'ubuntu','interfaces':[{'ip':None,'port':"10050"}]
 #                                                  ,'groups':[{'groupid':None}]},'id':452,'auth':None}
 
-GROUPINFO = {'jsonrpc':"2.0",'method':"hostgroup.get",'params':{'output':'extend','filter':{'name':["Zabbix servers",]}},'id':1109,'auth':None}
+GROUPINFO = {'jsonrpc':"2.0",'method':"hostgroup.get",'params':{'output':'extend','filter':{'name':["Zabbix servers",]}},'id':1,'auth':None}
 
 TEMPINFO = {'jsonrpc':"2.0",'method':"template.get",'params':{'output':'extend',
             'filter':{'host':["Template App Apache Web Server zapache",
-            "Template App Zabbix Agent"]}},'id':1109,'auth':None}
+            "Template App Zabbix Agent"]}},'id':1,'auth':None}
 
 ACTIONINFO = {'jsonrpc':"2.0",'method':"action.create",
               'params':{'name':'Trigger action','eventsource':0,'status':0,'esc_period':120,'def_shortdata':"{TRIGGER.NAME}:{TRIGGER.STATUS}",
                         'def_longdata':"{TRIGGER.NAME}: {TRIGGER.STATUS}\r\nLast value: {ITEM.LASTVALUE]\r\n\r\n{TRIGGER.URL}",
-                        "filter":{"evaltype":0,"conditions":[{'conditiontype':1,'operator':0,'value':None}]},'operations':[{'operationtype':1,
-                            'esc_period':0,'esc_step_from':1,'esc_step_to':2,'evaltype':0,'opcommand':"service apache2 restart",'opcommand_hst':None
 
-                            }]
-                        }}
+                        "filter":{"evaltype":0,"conditions":[{'conditiontype':2,'operator':0,'value':None}]},
+                        'operations':[{'operationtype':1,'esc_period':0,'esc_step_from':1,
+                                       'esc_step_to':2,'evaltype':0,
+                                       'opcommand':{'command':'service apache2 restart','type':2,'authtype':0,'password':'root',
+                                                     'port':22,'username':'root'},'opcommand_hst':[{'hostid':None}]}]
+                        },'auth':None,'id':1}
 
 
 
+
+TINFO= {'jsonrpc':"2.0",'method':"host.get",'params':{'output':['hostid'],
+                                                        'selectTriggers':'extend','filter':{'host':['ubuntu'],'description':['Apache down on {HOST.NAME}']}},'id':1,'auth':None}
 
 URL = 'http://192.168.11.51:80/zabbix/api_jsonrpc.php'
 HEADERS={'Content-Type':'application/json-rpc'}
@@ -110,11 +115,14 @@ class VNFMonitorZabbix(extensions.PluginInterface):
         info = ADDINFO
         ginfo = GROUPINFO
         tinfo = TEMPINFO
+        aainfo = TINFO
         ainfo = ACTIONINFO
         info['method'] ='host.create'
         tinfo['auth']=token
         ginfo['auth'] = token
         info['auth'] =str(token)
+        aainfo['auth'] =token
+        ainfo['auth'] = token
         print("kwargs", kwargs.keys())
 
         print("###################################################")
@@ -160,13 +168,52 @@ class VNFMonitorZabbix(extensions.PluginInterface):
         print("###################################################")
 
         # response = requests.post(URL, headers=HEADERS, data=json.dumps(info))
+
+        # get host id
         response = requests.post(URL,headers=HEADERS,data=json.dumps(info))
 
         response_dict = dict(response.json())
         print("response_dict", response_dict)
-        print("response_dict", response_dict['result']['hostids'])
+        print("response_dict", response_dict['result'])
+
         host_id = response_dict['result']['hostids']
-        ainfo['params']['operations']['opcommand_hst'] = str(host_id)
+
+
+
+        # aainfo['params']['hostids']= str(host_id)
+
+        ## trriger infomation
+        # aainfo['params']['filter']['hostid'][0] = str(host_id)
+        print("aainfo", aainfo)
+        response = requests.post(URL, headers=HEADERS, data=json.dumps(aainfo))
+        print("####################TESTTESTSTESTETEE###################")
+        print("response trigger",response)
+        print("trigger",response.status_code)
+        print("trigger",response.json())
+        print("####################TESTTESTSTESTETEE###################")
+        print("####################TESTTESTSTESTETEE###################")
+        print("####################TESTTESTSTESTETEE###################")
+        print("####################TESTTESTSTESTETEE###################")
+
+        temp = dict(response.json())
+        print("trigger item ",temp['result'][0]['triggers'][0]['triggerid'])
+        triggerid = temp['result'][0]['triggers'][0]['triggerid']
+
+
+        ##create action
+        ainfo['params']['filter']['conditions'][0]['value']=triggerid
+        ainfo['params']['operations'][0]['opcommand_hst'][0]['hostid'] = host_id[0]
+        print("####################AAAAAAAAAAAAAAAAAAAAA###################")
+        print('afino',ainfo)
+        response = requests.post(URL, headers=HEADERS, data=json.dumps(ainfo))
+        temp = dict(response.json())
+        print('action result: ',temp )
+
+
+
+
+
+
 
 
 
