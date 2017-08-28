@@ -311,6 +311,7 @@ class VNFServiceMonitor(object):
         print("###################################################")
         print("Line 307 _invoke monitoring in monitor.py")
         print("vnf_dict.keys()", vnf_dict.keys())
+        print("mgmt_url ",mgmt_url)
         print("id", vnf_dict['id'])
         print("dev_attrs", dev_attrs)
         print("###################################################")

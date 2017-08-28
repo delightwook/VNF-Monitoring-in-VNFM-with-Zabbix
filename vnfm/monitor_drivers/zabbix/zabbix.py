@@ -21,44 +21,87 @@ import requests
 from oslo_config import cfg
 
 from tacker.api import extensions
-
+from fnmatch import fnmatchcase
 OPTS = [
     cfg.StrOpt('servicename', default='apache2',
                help=_('select Service name'))
 ]
 cfg.CONF.register_opts(OPTS, 'zabbix')
 
+
+
+
 AUTHINFO = {'jsonrpc':"2.0",'method':"user.login",'params':{'user':"Admin",'password':"zabbix"},'id':1,'auth':None}
-ADDINFO = {'jsonrpc':"2.0",'method':"",'params':{'host':'ubuntu',
-                     'interfaces':[{'type':1,'main':1,'useip':1,'dns':"",'ip':None,'port':"10050"}],
-                      'templates':[{'templateid':None},{'templateid':None}],'groups':[{'groupid':None}]},'id':4,'auth':None}
-# ADDINFO = {'jsonrpc':"2.0",'method':"",'params':{'host':'ubuntu','interfaces':[{'ip':None,'port':"10050"}]
-#                                                  ,'groups':[{'groupid':None}]},'id':452,'auth':None}
 
-GROUPINFO = {'jsonrpc':"2.0",'method':"hostgroup.get",'params':{'output':'extend','filter':{'name':["Zabbix servers",]}},'id':1,'auth':None}
 
-TEMPINFO = {'jsonrpc':"2.0",'method':"template.get",'params':{'output':'extend',
-            'filter':{'host':["Template App Apache Web Server zapache",
+TEMP_GET_DICT = {'jsonrpc':"2.0",'method':"template.get",'params':{'output':'extend',
+            'filter':{'host':["Template App HTTP Service",
             "Template App Zabbix Agent"]}},'id':1,'auth':None}
 
-ACTIONINFO = {'jsonrpc':"2.0",'method':"action.create",
+
+TEMP_CREATE_DICT = {'jsonrpc':"2.0",'method':"template.create",
+                    'params':{'host':"Template Tacker  ",'groups':{'groupid':1}
+            ,'hosts':[]},'id':1004,'auth':None}
+
+
+ITEM_CREATE_DICT = {'jsonrpc':"2.0",'method':"item.create",
+                    'params':{'hostid':None,'interfaceid':'NULL','name':"",'key_':"",'type':0,
+                              'value_type':3,'delay':1},'id':1004,'auth':None}
+
+
+
+
+ITEM_KEY_LIST={'Agent Status':'agent.ping','Network Status':'net.if.total',
+               'Service Health':'net.tcp.service','maximum_pro_cpu_usage':'proc.cpu.util',
+              'maximum_pro_memory_usage':'proc.mem','maximum_cpu_memory_usage':'system.cpu.util',
+               'maximum_cpu_load_usage':'system.cpu.load','Process Number':'proc.num',
+               'Total Memory Size':'vm.memory.size[total]','Swap Size':'system.swap.size'}
+
+
+TRIGGER_CREATE_DICT={'jsonrpc':"2.0",'method':"trigger.create",'templateid': None ,'auth':None,'id':1004}
+
+TRIGGER_LIST={'Agent Status':[{'description':'Zabbix agent on {HOST.NAME} is unreachable for 5 minutes',
+                                'expression':'','priority':3}],
+               'Service Health':[{'description':'service id down on {HOST.NAME}','expression':'','priority':3}],
+              'maximum_pro_cpu_usage':[{'description':'Process is too high on {HOST.NAME}','expression':'','priority':3}],
+              'maximum_pro_memory_usage':[{'description':'Process Memory is lacking on {HOST.NAME}','expression':'','priority':3}],
+              'maximum_cpu_memory_usage':[{'description':'Disk I/O is overloaded on {HOST.NAME}','expression':'' ,'priority':3}],
+               'maximum_cpu_load_usage':[{'description':'Processor load is too high on {HOST.NAME}','expression':'','priority':3}],
+              'Process Number':[{'description':'Too many processes running on {HOST.NAME}','expression':'','priority':3}]}
+
+TINFO= {'jsonrpc':"2.0",'method':"host.get",'params':{'output':['hostid'],
+                                                        'selectTriggers':'extend',
+                                                      'filter':{'host':['ubuntu'],'description':['HTTP service is down on {HOST.NAME}']}},'id':1,'auth':None}
+
+
+ACTION_CREATE_DICT = {'jsonrpc':"2.0",'method':"action.create",
               'params':{'name':'Trigger action','eventsource':0,'status':0,'esc_period':120,'def_shortdata':"{TRIGGER.NAME}:{TRIGGER.STATUS}",
                         'def_longdata':"{TRIGGER.NAME}: {TRIGGER.STATUS}\r\nLast value: {ITEM.LASTVALUE]\r\n\r\n{TRIGGER.URL}",
 
                         "filter":{"evaltype":0,"conditions":[{'conditiontype':2,'operator':0,'value':None}]},
                         'operations':[{'operationtype':1,'esc_period':0,'esc_step_from':1,
                                        'esc_step_to':2,'evaltype':0,
-                                       'opcommand':{'command':'service apache2 restart','type':2,'authtype':0,'password':'root',
+                                       'opcommand':{'command':None,'type':2,'authtype':0,'password':'root',
                                                      'port':22,'username':'root'},'opcommand_hst':[{'hostid':None}]}]
                         },'auth':None,'id':1}
 
+ACTION_CMD_LIST={'Service Health':'service apache2 restart'}
 
 
 
-TINFO= {'jsonrpc':"2.0",'method':"host.get",'params':{'output':['hostid'],
-                                                        'selectTriggers':'extend','filter':{'host':['ubuntu'],'description':['Apache down on {HOST.NAME}']}},'id':1,'auth':None}
+HOST_CREATE_INFO = {'jsonrpc':"2.0",'method':"host.create",'params':{'host':'ubuntu',
+                     'interfaces':[{'type':1,'main':1,'useip':1,'dns':"",'ip':None,'port':"10050"}],
+                      'templates':[{'templateid':None}],'groups':[{'groupid':None}]},'id':4,'auth':None}
 
-URL = 'http://192.168.11.51:80/zabbix/api_jsonrpc.php'
+
+
+
+GROUP_GET_INFO = {'jsonrpc':"2.0",'method':"hostgroup.get",'params':{'output':'extend','filter':{'name':["Zabbix servers",]}},'id':1,'auth':None}
+
+GRAPH_CREATE_DICT = {'jsonrpc':'2.0','method':'graph.create','params':{'name':None,'width':900,'height':200,
+                                                                       'gitems':[]},'auth':None,'id':1004}
+
+URL = 'http://192.168.11.53:80/zabbix/api_jsonrpc.php'
 HEADERS={'Content-Type':'application/json-rpc'}
 
 
@@ -109,105 +152,337 @@ class VNFMonitorZabbix(extensions.PluginInterface):
     def add_trigger_action(self):
         pass
 
+    def send_post(self,query):
+        response = requests.post(URL, headers=HEADERS, data=json.dumps(query))
+        return dict(response.json())
+
+    def create_graph(self,token,itemid,name):
+        GRAPH_C_DICT = GRAPH_CREATE_DICT
+        GRAPH_C_DICT['auth'] = token
+
+
+        gitems= [{'itemid':itemid,'color':'00AA00'}]
+
+        GRAPH_C_DICT['params']['gitems']=gitems
+        GRAPH_C_DICT['params']['name'] = name
+        print('GRAPH_C_DICT',GRAPH_C_DICT)
+        response = self.send_post(GRAPH_C_DICT)
+        print('response',response)
+
+
+
+
+    def create_action(self,token,triggerid,hostid,servicename):
+        ACTION_C_DICT= ACTION_CREATE_DICT
+        ACTION_C_DICT['auth'] = token
+        ACTION_C_DICT['params']['operations'][0]['opcommand_hst'][0]['hostid'] = hostid[0]
+        ACTION_C_DICT['params']['operations'][0]['opcommand']['command'] = ACTION_CMD_LIST[servicename]
+        ACTION_C_DICT['params']['filter']['conditions'][0]['value'] = triggerid[0]
+        print('ACTION_C_DICT ',ACTION_C_DICT)
+        response = self.send_post(ACTION_C_DICT)
+        return response
+
+    def create_trigger(self,token,trigger_params,templateid):
+        TRIGGER_C_DICT = TRIGGER_CREATE_DICT
+        TRIGGER_C_DICT['auth'] =token
+        TRIGGER_C_DICT['params'] = trigger_params
+        TRIGGER_C_DICT['templateid']=templateid
+        print('##############################################')
+        print('##############################################')
+        print("TRIGGER_C_DICTTRIGGER_C_DICTTRIGGER_C_DICT",TRIGGER_C_DICT)
+        response = self.send_post(TRIGGER_C_DICT)
+        print("response : ",response)
+        print('##############################################')
+        print('##############################################')
+        return response
+
+
+
+    def create_trigger_param(self):
+        pass
+
+
+    def create_item(self,parameters,token,vduname,tempid,tempname):
+
+        ITEM_C_DICT = ITEM_CREATE_DICT
+        ITEM_C_DICT['auth'] = token
+        TRIGGER_P_DICT=TRIGGER_LIST
+        print("parameters : ",parameters)
+
+
+
+
+        maximum_high_pro_value = parameters['maximum_high_pro_value']
+        maximum_cpu_memory_usage = parameters['maximum_cpu_memory_usage']
+        maximum_cpu_load_usage = parameters['maximum_cpu_load_usage']
+        maximum_pro_memory_usage = parameters['service']['maximum_pro_memory_usage']
+
+        print('##############################################')
+        print('##############################################')
+
+        print('SERVICE PARAMETERS :',parameters['service'])
+
+        print('##############################################')
+        print('##############################################')
+        trigger_params = []
+
+        serviceid = None
+        servicename = None
+
+        #2. Create ITEM
+
+        ITEM_C_DICT['params']['hostid'] = int(tempid)
+
+
+        #Agent Status
+        ITEM_C_DICT['params']['name'] = 'Zabbix Agent Status Check'
+        ITEM_C_DICT['params']['key_'] = str(ITEM_KEY_LIST['Agent Status'])
+        ITEM_C_DICT['params']['value_type'] = 3
+        response = self.send_post(ITEM_C_DICT)
+
+        TRIGGER_P_DICT['Agent Status'][0]['expression']='{' + tempname+':'+ ITEM_KEY_LIST['Agent Status']+'.nodata(5m)}=1'
+
+
+        trigger_params.append(TRIGGER_P_DICT['Agent Status'][0])
+
+        print('##############################################')
+        print('##############################################')
+        print('TRIGGER_P_DICT[Agent Status] : ',TRIGGER_P_DICT['Agent Status'])
+        print('trigger_params : ', trigger_params)
+        print('##############################################')
+        print('##############################################')
+
+        # Network Status
+        temp = '[' + 'ens3' + ']'
+        ITEM_C_DICT['params']['name'] = 'Network Status Check'
+        ITEM_C_DICT['params']['key_'] = str(ITEM_KEY_LIST['Network Status'] + temp)
+        ITEM_C_DICT['params']['value_type'] = 3
+        self.send_post(ITEM_C_DICT)
+        ###Call create_function
+        # self.create_trigger()
+
+
+
+            # this code is find servicesssss
+            # if you all service check status shell script make
+            # so we don't need this if code
+        for item in parameters.keys():
+            if  item =='service' :
+                for item in parameters['service'].keys():
+                    if item == 'servicename':
+                        if parameters['service'][item] == 'apache2':
+                            temp='['+'http'+']'
+                            #net.tcp.service[service,<ip>,<port>]
+                            ITEM_C_DICT['params']['name'] = 'Apache2 Status Check'
+                            ITEM_C_DICT['params']['key_'] = str(ITEM_KEY_LIST['Service Health'] +temp)
+                            ITEM_C_DICT['params']['value_type']=3
+
+                            response = self.send_post(ITEM_C_DICT)
+
+                            TRIGGER_P_DICT['Service Health'][0]['expression'] = '{' + tempname + ':' + \
+                                                                              ITEM_C_DICT['params']['key_'] +'.max(#3)}=0'
+
+                            print('response',response)
+                            response = self.create_trigger(token,TRIGGER_P_DICT['Service Health'][0],tempid)
+                            print('response', response)
+                            serviceid =response['result']['triggerids']
+                            servicename = 'Service Health'
+
+
+
+
+                        else:
+                            # net.tcp.service[service,<ip>,<port>]
+                            temp='['+parameters['service']['servicename']+']'
+                            ITEM_C_DICT['params']['name'] = 'Service Status Check'
+                            ITEM_C_DICT['params']['key_'] = str(ITEM_KEY_LIST['Service Health'] +temp)
+                            ITEM_C_DICT['params']['value_type']=3
+                            result =  self.send_post(ITEM_C_DICT)
+
+
+                            TRIGGER_P_DICT['Service Health'][0]['expression'] = '{' + tempname + ':' + \
+                                                                                ITEM_C_DICT['params'][
+                                                                                    'key_'] + '.max(#3)}=0'
+                            trigger_params.append(TRIGGER_P_DICT['Service Health'][0])
+
+
+                            ###Call create_function
+
+
+                            print('RESULT : ',result)
+                    else :
+
+                            # proc.cpu.util[<name>,<user>,<mode>,<cmdline>,<memtype>,<zone>] = >  process CPU util
+
+
+                            temp  = '[' + parameters['service']['servicename'] + ',root]'
+                            ITEM_C_DICT['params']['key_'] = str(ITEM_KEY_LIST[item]) + temp
+
+                            if item == 'maximum_pro_cpu_usage' :
+                                 continue
+                                 ITEM_C_DICT['params']['value_type'] = 3
+                                 TRIGGER_P_DICT['maximum_pro_memory_usage'][0]['expression'] = '{' + tempname + ':' + \
+                                                                                     ITEM_C_DICT['params'][
+                                                                                         'key_'] + '.avg(5)}>25'
+                                 trigger_params.append(TRIGGER_P_DICT['maximum_pro_cpu_usage'][0])
+
+
+                            else:
+                                # proc.mem[<name>,<user>,<mode>,<cmdline>,<memtype>] = >  process usage memory
+                                ITEM_C_DICT['params']['value_type'] = 3
+                                ITEM_C_DICT['params']['name'] = 'Service '+ parameters['service']['servicename']+ 'Memory Usage'
+
+                                print("ITEM_C_DICT ", ITEM_C_DICT)
+                                result = self.send_post(ITEM_C_DICT)
+                                self.create_graph(token, result['result']['itemids'][0],
+                                                  ITEM_C_DICT['params']['name'] + ' Graph')
+
+                                TRIGGER_P_DICT['maximum_pro_memory_usage'][0]['expression'] = '{' + tempname + ':' + \
+                                                                                              ITEM_C_DICT['params'][
+                                                                                                  'key_'] + '.avg(5)}>'+maximum_pro_memory_usage.replace("M","")
+                                trigger_params.append(TRIGGER_P_DICT['maximum_pro_cpu_usage'][0])
+
+                                print('RESULT : ', result)
+            elif item == 'maximum_high_pro_value' :
+                temp = '[,,run]'
+                # procnum[<name>,<user>,<state>,<cmdline>]
+                ITEM_C_DICT['params']['name'] = 'Process Number'
+                ITEM_C_DICT['params']['key_'] = str(ITEM_KEY_LIST['Process Number'] + temp)
+                ITEM_C_DICT['params']['value_type'] =3
+                print("ITEM_C_DICT ITEM_C_DICT", ITEM_C_DICT)
+                result = self.send_post(ITEM_C_DICT)
+                self.create_graph(token, result['result']['itemids'][0],ITEM_C_DICT['params']['name']+' Graph')
+                print('result ' ,result)
+
+
+                print('type maximum_high_pro_value ',type(maximum_high_pro_value))
+
+
+                TRIGGER_P_DICT['Process Number'][0]['expression'] = '{' + tempname + ':' + ITEM_C_DICT['params']['key_'] + '.avg(5s)}>' + str(maximum_high_pro_value)
+                print('TRIGGER_P_DICT',TRIGGER_P_DICT)
+                print('maximum_high_pro_value',maximum_high_pro_value)
+                print('type maximum_high_pro_value ',type(maximum_high_pro_value))
+
+                trigger_params.append(TRIGGER_P_DICT['Process Number'][0])
+
+
+                ###Call create_function
+
+
+                print('RESULT : ', result)
+            elif item == 'maximum_cpu_memory_usage':
+                temp = '[,iowait]'
+                # system.cpu.util<cpu>,<mode>] => CPU Usage
+                ITEM_C_DICT['params']['name'] = 'CPU Utill Usage'
+                ITEM_C_DICT['params']['key_'] = str(ITEM_KEY_LIST['maximum_cpu_memory_usage'] + temp)
+                ITEM_C_DICT['params']['value_type'] = 0
+                print("ITEM_C_DICT ", ITEM_C_DICT)
+                result = self.send_post(ITEM_C_DICT)
+                self.create_graph(token, result['result']['itemids'][0], ITEM_C_DICT['params']['name'] + ' Graph')
+                TRIGGER_P_DICT['maximum_cpu_memory_usage'][0]['expression'] = '{' + tempname + ':' + \
+                                                                           ITEM_C_DICT['params'][
+                                                                               'key_'] + '.avg(1m)}>' +maximum_cpu_memory_usage.replace("M","")
+
+                trigger_params.append(TRIGGER_P_DICT['maximum_cpu_memory_usage'][0])
+
+
+            elif item ==  'maximum_cpu_load_usage':
+                temp = '[percpu,avg1]'
+                #system.cpu.load[<cpu>,<mode>]
+                ITEM_C_DICT['params']['name'] = 'CPU Load'
+                ITEM_C_DICT['params']['key_'] = str(ITEM_KEY_LIST['maximum_cpu_load_usage'] + temp)
+                ITEM_C_DICT['params']['value_type'] = 0
+                print("ITEM_C_DICT ", ITEM_C_DICT)
+                result = self.send_post(ITEM_C_DICT)
+                self.create_graph(token, result['result']['itemids'][0], ITEM_C_DICT['params']['name'] + ' Graph')
+                TRIGGER_P_DICT['maximum_cpu_load_usage'][0]['expression'] = '{' + tempname + ':' + \
+                                                                           ITEM_C_DICT['params'][
+                                                                               'key_'] + '.avg(1m)}>' + maximum_cpu_load_usage.replace("%","")
+                print('TRIGGER_P_DICT[maximum_cpu_load_usage][0][expression]',TRIGGER_P_DICT['maximum_cpu_load_usage'][0]['expression'])
+
+                trigger_params.append(TRIGGER_P_DICT['maximum_cpu_load_usage'][0])
+
+
+        response = self.create_trigger(token, trigger_params, tempid)
+        print('response' ,response)
+
+        trigger_params = []
+        return serviceid,servicename
+
+
+    def create_template(self,kwagrs,token,vduname):
+        parameters = kwagrs['vdus'][vduname[0]]['parameters']
+        TEMP_C_DICT = TEMP_CREATE_DICT
+        server_token = token
+
+
+        # 1. create template
+        TEMP_C_DICT['params']['host'] += str(vduname[0])
+        TEMP_C_DICT['auth'] = server_token
+        print("TEMP_CREATE_DICT : ", TEMP_C_DICT)
+        temp_create_response = self.send_post(TEMP_C_DICT)
+        print("temp_create_response : ",temp_create_response)
+        tmpid= temp_create_response['result']['templateids'][0]
+
+
+        #Call Create ITEM FUNCTION
+
+        serviceid,servicename = self.create_item(parameters, token, vduname, tmpid,TEMP_C_DICT['params']['host'])
+        return tmpid,serviceid,servicename
+
+
+
+
+
 
 
     def add_host_create_api(self,kwargs,token):
-        info = ADDINFO
-        ginfo = GROUPINFO
-        tinfo = TEMPINFO
-        aainfo = TINFO
-        ainfo = ACTIONINFO
-        info['method'] ='host.create'
-        tinfo['auth']=token
-        ginfo['auth'] = token
-        info['auth'] =str(token)
-        aainfo['auth'] =token
-        ainfo['auth'] = token
-        print("kwargs", kwargs.keys())
 
-        print("###################################################")
-        print("###################################################")
-        ######################################we Sholud change this code ###########################################
-        ######################################we Sholud change this code ###########################################
-        ######################################we Sholud change this code ###########################################
-        ######################################we Sholud change this code ###########################################
-        ######################################we Sholud change this code ###########################################
+        HOST_C_DICT = HOST_CREATE_INFO
+        GROUP_G_DICT = GROUP_GET_INFO
+        vduname = [node for node in kwargs['vdus'] if fnmatchcase(node, 'VDU*')]
+        mgmt_ip =  kwargs['vdus'][vduname[0]]['mgmt_ip']
+        zbx_admin_passwd= kwargs['vdus'][vduname[0]]['parameters']['zabbix_admin_passwd']
+        ssh_root_passwd = kwargs['vdus'][vduname[0]]['parameters']['ssh_root_passwd']
+        zabbix_server_ip =kwargs['vdus'][vduname[0]]['parameters']['zabbix_server_ip']
 
-        response = requests.post(URL, headers=HEADERS, data=json.dumps(ginfo))
-        response_dict = dict(response.json())
+        # 1. create TEMPLATE(ITEM, TRIGGER,ACTION)
+        tempid,servicetgrid,servicetgrname = self.create_template(kwargs,token,vduname)
+
+        # 2. create host
+        print("########################################################")
+        print("########################################################")
+        print("########################################################")
+        print("Line 128 add_host_create_api in zabbix.py")
+        print("mgmt_ip : ",mgmt_ip)######")
+        print("########################################################")
 
 
-###############ALL REQUEST one FUNCIO
+        GROUP_G_DICT['auth'] = token
+        print("zbx_admin_passwd : ", zbx_admin_passwd)
+        print("ssh_root_passwd : ", ssh_root_passwd)
+        print("zabbix_server_ip : ", zabbix_server_ip)
 
-        #
-        # if 'apache2' == kwargs['vdus']['VDU1']['parameters']['servicename']:
-        #     info['params']['templates'][0]['host'] = 'Template App Apache Web Server zapache'
-        print("rrrrrrrrrrr", response_dict.keys())
-
-
-
-        info['params']['interfaces'][0]['ip'] = kwargs['vdus']['VDU1']['mgmt_ip']
-        info['params']['groups'][0]['groupid'] = response_dict['result'][0]['groupid']
-
-        response = requests.post(URL, headers=HEADERS, data=json.dumps(tinfo))
-        response_dict = dict(response.json())
-
-        info['params']['templates'][0]['templateid'] = str(response_dict['result'][0]['templateid'])
-        info['params']['templates'][1]['templateid'] = str(response_dict['result'][1]['templateid'])
+        print("########################################################")
+        print("########################################################")
+        print("########################################################")
 
 
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 97 add_host_create_api in zabbix.py")
-        print("info : ", info)
-        print("kwargs",kwargs)
+        GROUP_G_DICT['auth'] = token
+        response = self.send_post(GROUP_G_DICT)
 
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-
-        # response = requests.post(URL, headers=HEADERS, data=json.dumps(info))
-
-        # get host id
-        response = requests.post(URL,headers=HEADERS,data=json.dumps(info))
-
-        response_dict = dict(response.json())
-        print("response_dict", response_dict)
-        print("response_dict", response_dict['result'])
-
-        host_id = response_dict['result']['hostids']
+        print('response',response)
+        HOST_C_DICT['auth'] = token
+        HOST_C_DICT['params']['interfaces'][0]['ip'] = mgmt_ip
+        HOST_C_DICT['params']['templates'][0]['templateid'] = tempid
+        HOST_C_DICT['params']['groups'][0]['groupid']=response['result'][0]['groupid']
+        print('HOST_C_DICT',HOST_C_DICT)
+        response = self.send_post(HOST_C_DICT)
+        print('response',response)
 
 
-
-        # aainfo['params']['hostids']= str(host_id)
-
-        ## trriger infomation
-        # aainfo['params']['filter']['hostid'][0] = str(host_id)
-        print("aainfo", aainfo)
-        response = requests.post(URL, headers=HEADERS, data=json.dumps(aainfo))
-        print("####################TESTTESTSTESTETEE###################")
-        print("response trigger",response)
-        print("trigger",response.status_code)
-        print("trigger",response.json())
-        print("####################TESTTESTSTESTETEE###################")
-        print("####################TESTTESTSTESTETEE###################")
-        print("####################TESTTESTSTESTETEE###################")
-        print("####################TESTTESTSTESTETEE###################")
-
-        temp = dict(response.json())
-        print("trigger item ",temp['result'][0]['triggers'][0]['triggerid'])
-        triggerid = temp['result'][0]['triggers'][0]['triggerid']
-
-
-        ##create action
-        ainfo['params']['filter']['conditions'][0]['value']=triggerid
-        ainfo['params']['operations'][0]['opcommand_hst'][0]['hostid'] = host_id[0]
-        print("####################AAAAAAAAAAAAAAAAAAAAA###################")
-        print('afino',ainfo)
-        response = requests.post(URL, headers=HEADERS, data=json.dumps(ainfo))
-        temp = dict(response.json())
-        print('action result: ',temp )
+        response = self.create_action(token,servicetgrid,response['result']['hostids'],servicetgrname)
+        print('ACTION RESPONSE : ',response)
 
 
 
@@ -215,12 +490,7 @@ class VNFMonitorZabbix(extensions.PluginInterface):
 
 
 
-
-
-
-
-
-    def connect_to_server(self):
+    def get_token_from_server(self):
         # reponse = requests.post(URL,headers=HEADERS,data=json.dumps(INFO))
         response = requests.post(URL, headers=HEADERS, data=json.dumps(AUTHINFO))
         response_dict = dict(response.json())
@@ -242,7 +512,7 @@ class VNFMonitorZabbix(extensions.PluginInterface):
 
 
     def add_to_svcmonitor(self, vnf, kwargs):
-        status_code,token = self.connect_to_server()
+        status_code,token = self.get_token_from_server()
         self.add_host_create_api(kwargs,token)
 
         print("###################################################")

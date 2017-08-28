@@ -353,7 +353,7 @@ class TOSCAToHOT(object):
         print("Line 297  _generate_hot_from_tosca in translate_template.py")
         print("vnfd_dict.keys", vnfd_dict.keys())
         print("vnfd_dict", vnfd_dict['topology_template']['node_templates'].keys())
-        print("vnfd_dict", vnfd_dict['topology_template']['node_templates']['VDU1']['properties']['service_monitoring_policy'])
+
         print("###################################################")
         print("###################################################")
         print("###################################################")

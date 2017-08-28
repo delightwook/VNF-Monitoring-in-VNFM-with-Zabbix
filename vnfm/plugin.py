@@ -342,6 +342,14 @@ class VNFMPlugin(vnfm_db.VNFMPluginDb, VNFMMgmtMixin):
             return
 
         vnf_dict['mgmt_url'] = mgmt_url
+        print("###################################################")
+        print("###################################################")
+        print("###################################################")
+        print("Line 348 create_vnfin plugin.py")
+        print("vnf_dict['mgmt_url']", vnf_dict['mgmt_url'])
+        print("###################################################")
+        print("###################################################")
+        print("###################################################")
 
         kwargs = {
             mgmt_constants.KEY_ACTION: mgmt_constants.ACTION_CREATE_VNF,
@@ -441,6 +449,8 @@ class VNFMPlugin(vnfm_db.VNFMPluginDb, VNFMMgmtMixin):
 
         def create_vnf_wait():
             self._create_vnf_wait(context, vnf_dict, vim_auth, infra_driver)
+
+            print("",vnf_dict['attributes'])
 
             if 'service_monitoring_policy' in vnf_dict['attributes']:
                 print("###################################################")

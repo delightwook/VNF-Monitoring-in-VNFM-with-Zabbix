@@ -13,14 +13,44 @@ data_types:
           type: string
         required: false
 
-  tosca.datatypes.tacker.ServiceMonitoringParams:
+  tosca.datatypes.tacker.ServiceInfoParams:
     properties:
       servicename:
         type: string
         required: true
-      maximum_cpu_usage:
+      maximum_pro_cpu_usage:
         type: string
         required: false
+      maximum_pro_memory_usage:
+        type: string
+        required: false
+
+
+  tosca.datatypes.tacker.ServiceMonitoringParams:
+    properties:
+      service:
+        type: tosca.datatypes.tacker.ServiceInfoParams
+        required: true
+      maximum_cpu_load_usage:
+        type: string
+        required: false
+      maximum_cpu_memory_usage:
+        type: string
+        required: false
+      maximum_process_load:
+        type: string
+        required: false
+      ssh_root_passwd:
+        type: string
+        required: false
+      zabbix_server_ip:
+        type: string
+        required: false
+      zabbix_admin_passwd:
+        type: string
+        required: false
+
+
 
   tosca.datatypes.tacker.MonitoringParams:
     properties:
