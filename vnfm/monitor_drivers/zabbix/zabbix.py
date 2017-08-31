@@ -62,8 +62,7 @@ TRIGGER_CREATE_DICT={'jsonrpc':"2.0",'method':"trigger.create",'templateid': Non
 
 TRIGGER_LIST={'Agent Status':[{'description':'Zabbix agent on {HOST.NAME} is unreachable for 5 minutes',
                                 'expression':'','priority':3}],
-               'Service Health':[{'description':'service id down on {HOST.NAME}','expression':'','priority':3}],
-              'maximum_pro_cpu_usage':[{'description':'Process is too high on {HOST.NAME}','expression':'','priority':3}],
+               'Service Health':[{'description':'service is down on {HOST.NAME}','expression':'','priority':3}],
               'maximum_pro_memory_usage':[{'description':'Process Memory is lacking on {HOST.NAME}','expression':'','priority':3}],
               'maximum_cpu_memory_usage':[{'description':'Disk I/O is overloaded on {HOST.NAME}','expression':'' ,'priority':3}],
                'maximum_cpu_load_usage':[{'description':'Processor load is too high on {HOST.NAME}','expression':'','priority':3}],
@@ -81,11 +80,11 @@ ACTION_CREATE_DICT = {'jsonrpc':"2.0",'method':"action.create",
                         "filter":{"evaltype":0,"conditions":[{'conditiontype':2,'operator':0,'value':None}]},
                         'operations':[{'operationtype':1,'esc_period':0,'esc_step_from':1,
                                        'esc_step_to':2,'evaltype':0,
-                                       'opcommand':{'command':None,'type':2,'authtype':0,'password':'root',
-                                                     'port':22,'username':'root'},'opcommand_hst':[{'hostid':None}]}]
+                                       'opcommand':{'command':None,'type':0,'execute_on':0,
+                                                     },'opcommand_hst':[{'hostid':None}]}]
                         },'auth':None,'id':1}
 
-ACTION_CMD_LIST={'Service Health':'service apache2 restart'}
+ACTION_CMD_LIST={'Service Health':'sudo service apache2 restart'}
 
 
 
@@ -175,6 +174,7 @@ class VNFMonitorZabbix(extensions.PluginInterface):
     def create_action(self,token,triggerid,hostid,servicename):
         ACTION_C_DICT= ACTION_CREATE_DICT
         ACTION_C_DICT['auth'] = token
+
         ACTION_C_DICT['params']['operations'][0]['opcommand_hst'][0]['hostid'] = hostid[0]
         ACTION_C_DICT['params']['operations'][0]['opcommand']['command'] = ACTION_CMD_LIST[servicename]
         ACTION_C_DICT['params']['filter']['conditions'][0]['value'] = triggerid[0]
@@ -319,13 +319,8 @@ class VNFMonitorZabbix(extensions.PluginInterface):
                             ITEM_C_DICT['params']['key_'] = str(ITEM_KEY_LIST[item]) + temp
 
                             if item == 'maximum_pro_cpu_usage' :
-                                 continue
-                                 ITEM_C_DICT['params']['value_type'] = 3
-                                 TRIGGER_P_DICT['maximum_pro_memory_usage'][0]['expression'] = '{' + tempname + ':' + \
-                                                                                     ITEM_C_DICT['params'][
-                                                                                         'key_'] + '.avg(5)}>25'
-                                 trigger_params.append(TRIGGER_P_DICT['maximum_pro_cpu_usage'][0])
 
+                                 pass
 
                             else:
                                 # proc.mem[<name>,<user>,<mode>,<cmdline>,<memtype>] = >  process usage memory
@@ -339,8 +334,8 @@ class VNFMonitorZabbix(extensions.PluginInterface):
 
                                 TRIGGER_P_DICT['maximum_pro_memory_usage'][0]['expression'] = '{' + tempname + ':' + \
                                                                                               ITEM_C_DICT['params'][
-                                                                                                  'key_'] + '.avg(5)}>'+maximum_pro_memory_usage.replace("M","")
-                                trigger_params.append(TRIGGER_P_DICT['maximum_pro_cpu_usage'][0])
+                                                                                                  'key_'] + '.avg(5)}>'+str(maximum_pro_memory_usage)
+                                trigger_params.append(TRIGGER_P_DICT['maximum_pro_memory_usage'][0])
 
                                 print('RESULT : ', result)
             elif item == 'maximum_high_pro_value' :
@@ -381,7 +376,7 @@ class VNFMonitorZabbix(extensions.PluginInterface):
                 self.create_graph(token, result['result']['itemids'][0], ITEM_C_DICT['params']['name'] + ' Graph')
                 TRIGGER_P_DICT['maximum_cpu_memory_usage'][0]['expression'] = '{' + tempname + ':' + \
                                                                            ITEM_C_DICT['params'][
-                                                                               'key_'] + '.avg(1m)}>' +maximum_cpu_memory_usage.replace("M","")
+                                                                               'key_'] + '.avg(1m)}>' +str(maximum_cpu_memory_usage)
 
                 trigger_params.append(TRIGGER_P_DICT['maximum_cpu_memory_usage'][0])
 
@@ -397,12 +392,13 @@ class VNFMonitorZabbix(extensions.PluginInterface):
                 self.create_graph(token, result['result']['itemids'][0], ITEM_C_DICT['params']['name'] + ' Graph')
                 TRIGGER_P_DICT['maximum_cpu_load_usage'][0]['expression'] = '{' + tempname + ':' + \
                                                                            ITEM_C_DICT['params'][
-                                                                               'key_'] + '.avg(1m)}>' + maximum_cpu_load_usage.replace("%","")
+                                                                               'key_'] + '.avg(1m)}>' + str(maximum_cpu_load_usage)
                 print('TRIGGER_P_DICT[maximum_cpu_load_usage][0][expression]',TRIGGER_P_DICT['maximum_cpu_load_usage'][0]['expression'])
 
                 trigger_params.append(TRIGGER_P_DICT['maximum_cpu_load_usage'][0])
 
-
+        print("TRIGGERPARAMSTRIGGERPARAMSTRIGGERPARAMSTRIGGERPARAMSTRIGGERPARAMS")
+        print('trigger_params',trigger_params)
         response = self.create_trigger(token, trigger_params, tempid)
         print('response' ,response)
 
@@ -417,7 +413,8 @@ class VNFMonitorZabbix(extensions.PluginInterface):
 
 
         # 1. create template
-        TEMP_C_DICT['params']['host'] += str(vduname[0])
+        if str(vduname[0]) not in TEMP_C_DICT['params']['host']:
+            TEMP_C_DICT['params']['host'] += str(vduname[0])
         TEMP_C_DICT['auth'] = server_token
         print("TEMP_CREATE_DICT : ", TEMP_C_DICT)
         temp_create_response = self.send_post(TEMP_C_DICT)
@@ -443,7 +440,7 @@ class VNFMonitorZabbix(extensions.PluginInterface):
         vduname = [node for node in kwargs['vdus'] if fnmatchcase(node, 'VDU*')]
         mgmt_ip =  kwargs['vdus'][vduname[0]]['mgmt_ip']
         zbx_admin_passwd= kwargs['vdus'][vduname[0]]['parameters']['zabbix_admin_passwd']
-        ssh_root_passwd = kwargs['vdus'][vduname[0]]['parameters']['ssh_root_passwd']
+
         zabbix_server_ip =kwargs['vdus'][vduname[0]]['parameters']['zabbix_server_ip']
 
         # 1. create TEMPLATE(ITEM, TRIGGER,ACTION)
@@ -460,7 +457,7 @@ class VNFMonitorZabbix(extensions.PluginInterface):
 
         GROUP_G_DICT['auth'] = token
         print("zbx_admin_passwd : ", zbx_admin_passwd)
-        print("ssh_root_passwd : ", ssh_root_passwd)
+
         print("zabbix_server_ip : ", zabbix_server_ip)
 
         print("########################################################")
@@ -473,6 +470,7 @@ class VNFMonitorZabbix(extensions.PluginInterface):
 
         print('response',response)
         HOST_C_DICT['auth'] = token
+        HOST_C_DICT['params']['host'] = str(vduname[0]).lower()
         HOST_C_DICT['params']['interfaces'][0]['ip'] = mgmt_ip
         HOST_C_DICT['params']['templates'][0]['templateid'] = tempid
         HOST_C_DICT['params']['groups'][0]['groupid']=response['result'][0]['groupid']
