@@ -22,6 +22,7 @@ from oslo_config import cfg
 
 from tacker.api import extensions
 from fnmatch import fnmatchcase
+from copy import deepcopy
 OPTS = [
     cfg.StrOpt('servicename', default='apache2',
                help=_('select Service name'))
@@ -74,8 +75,8 @@ TINFO= {'jsonrpc':"2.0",'method':"host.get",'params':{'output':['hostid'],
 
 
 ACTION_CREATE_DICT = {'jsonrpc':"2.0",'method':"action.create",
-              'params':{'name':'Trigger action','eventsource':0,'status':0,'esc_period':120,'def_shortdata':"{TRIGGER.NAME}:{TRIGGER.STATUS}",
-                        'def_longdata':"{TRIGGER.NAME}: {TRIGGER.STATUS}\r\nLast value: {ITEM.LASTVALUE]\r\n\r\n{TRIGGER.URL}",
+              'params':{'name':'Trigger action ','eventsource':0,'status':0,'esc_period':120,'def_shortdata':"{TRIGGER.NAME}:{TRIGGER.STATUS}",
+                        'def_longdata':"{TRIGGER.NAME}: {TR`IGGER.STATUS}\r\nLast value: {ITEM.LASTVALUE]\r\n\r\n{TRIGGER.URL}",
 
                         "filter":{"evaltype":0,"conditions":[{'conditiontype':2,'operator':0,'value':None}]},
                         'operations':[{'operationtype':1,'esc_period':0,'esc_step_from':1,
@@ -84,7 +85,7 @@ ACTION_CREATE_DICT = {'jsonrpc':"2.0",'method':"action.create",
                                                      },'opcommand_hst':[{'hostid':None}]}]
                         },'auth':None,'id':1}
 
-ACTION_CMD_LIST={'Service Health':'sudo service apache2 restart'}
+ACTION_CMD_LIST={'Service Health':'sudo service'}
 
 
 
@@ -171,15 +172,19 @@ class VNFMonitorZabbix(extensions.PluginInterface):
 
 
 
-    def create_action(self,token,triggerid,hostid,servicename):
-        ACTION_C_DICT= ACTION_CREATE_DICT
+    def create_action(self,token,triggerid,hostid,cmdname,servicename,vdu):
+        ACTION_C_DICT= deepcopy(ACTION_CREATE_DICT)
         ACTION_C_DICT['auth'] = token
 
+
+        if str(vdu) not in ACTION_C_DICT['params']['name']:
+            ACTION_C_DICT['params']['name'] +=str(vdu)
         ACTION_C_DICT['params']['operations'][0]['opcommand_hst'][0]['hostid'] = hostid[0]
-        ACTION_C_DICT['params']['operations'][0]['opcommand']['command'] = ACTION_CMD_LIST[servicename]
+        ACTION_C_DICT['params']['operations'][0]['opcommand']['command'] = str(ACTION_CMD_LIST[cmdname])+' ' +str(servicename)+' restart'
         ACTION_C_DICT['params']['filter']['conditions'][0]['value'] = triggerid[0]
         print('ACTION_C_DICT ',ACTION_C_DICT)
         response = self.send_post(ACTION_C_DICT)
+        ACTION_C_DICT.clear()
         return response
 
     def create_trigger(self,token,trigger_params,templateid):
@@ -258,9 +263,6 @@ class VNFMonitorZabbix(extensions.PluginInterface):
         ITEM_C_DICT['params']['key_'] = str(ITEM_KEY_LIST['Network Status'] + temp)
         ITEM_C_DICT['params']['value_type'] = 3
         self.send_post(ITEM_C_DICT)
-        ###Call create_function
-        # self.create_trigger()
-
 
 
             # this code is find servicesssss
@@ -286,14 +288,15 @@ class VNFMonitorZabbix(extensions.PluginInterface):
                             response = self.create_trigger(token,TRIGGER_P_DICT['Service Health'][0],tempid)
                             print('response', response)
                             serviceid =response['result']['triggerids']
-                            servicename = 'Service Health'
+                            cmdname = 'Service Health'
+                            servicename = parameters['service'][item]
 
 
 
 
                         else:
                             # net.tcp.service[service,<ip>,<port>]
-                            temp='['+parameters['service']['servicename']+']'
+                            temp='['+parameters['service'][item]+']'
                             ITEM_C_DICT['params']['name'] = 'Service Status Check'
                             ITEM_C_DICT['params']['key_'] = str(ITEM_KEY_LIST['Service Health'] +temp)
                             ITEM_C_DICT['params']['value_type']=3
@@ -303,8 +306,11 @@ class VNFMonitorZabbix(extensions.PluginInterface):
                             TRIGGER_P_DICT['Service Health'][0]['expression'] = '{' + tempname + ':' + \
                                                                                 ITEM_C_DICT['params'][
                                                                                     'key_'] + '.max(#3)}=0'
-                            trigger_params.append(TRIGGER_P_DICT['Service Health'][0])
-
+                            print('response', response)
+                            response = self.create_trigger(token, TRIGGER_P_DICT['Service Health'][0], tempid)
+                            print('response', response)
+                            serviceid = response['result']['triggerids']
+                            cmdname = 'Service Health'
 
                             ###Call create_function
 
@@ -403,18 +409,32 @@ class VNFMonitorZabbix(extensions.PluginInterface):
         print('response' ,response)
 
         trigger_params = []
-        return serviceid,servicename
+        return serviceid,servicename,cmdname
 
 
     def create_template(self,kwagrs,token,vduname):
-        parameters = kwagrs['vdus'][vduname[0]]['parameters']
-        TEMP_C_DICT = TEMP_CREATE_DICT
+        parameters = kwagrs['vdus'][vduname]['parameters']
+        TEMP_C_DICT = deepcopy(TEMP_CREATE_DICT)
+
         server_token = token
 
-
+        print("###########################################################################3")
+        print("###########################################################################3")
+        print("###########################################################################3")
+        print("###########################################################################3")
+        print("###########################################################################3")
+        print("###########################################################################3")
+        print("TEMP_C_DICT :", TEMP_C_DICT)
+        print("TEMP_CREATE_DICT :", TEMP_CREATE_DICT)
+        print("###########################################################################3")
+        print("###########################################################################3")
+        print("###########################################################################3")
+        print("###########################################################################3")
+        print("###########################################################################3")
+        print("###########################################################################3")
         # 1. create template
-        if str(vduname[0]) not in TEMP_C_DICT['params']['host']:
-            TEMP_C_DICT['params']['host'] += str(vduname[0])
+        if str(vduname) not in TEMP_C_DICT['params']['host']:
+            TEMP_C_DICT['params']['host'] += str(vduname)
         TEMP_C_DICT['auth'] = server_token
         print("TEMP_CREATE_DICT : ", TEMP_C_DICT)
         temp_create_response = self.send_post(TEMP_C_DICT)
@@ -424,8 +444,29 @@ class VNFMonitorZabbix(extensions.PluginInterface):
 
         #Call Create ITEM FUNCTION
 
-        serviceid,servicename = self.create_item(parameters, token, vduname, tmpid,TEMP_C_DICT['params']['host'])
-        return tmpid,serviceid,servicename
+
+
+        print("###########################################################################3")
+        print("###########################################################################3")
+        print("###########################################################################3")
+        print("###########################################################################3")
+        print("###########################################################################3")
+        print("###########################################################################3")
+        print("TEMP_C_DICT :", TEMP_C_DICT)
+        print("TEMP_CREATE_DICT :", TEMP_CREATE_DICT)
+        print("###########################################################################3")
+        print("###########################################################################3")
+        print("###########################################################################3")
+        print("###########################################################################3")
+        print("###########################################################################3")
+        print("###########################################################################3")
+        # 1. create template
+        serviceid,servicename,cmdname = self.create_item(parameters, token, vduname, tmpid,TEMP_C_DICT['params']['host'])
+
+
+
+        TEMP_C_DICT.clear()
+        return tmpid,serviceid,cmdname,servicename
 
 
 
@@ -438,54 +479,57 @@ class VNFMonitorZabbix(extensions.PluginInterface):
         HOST_C_DICT = HOST_CREATE_INFO
         GROUP_G_DICT = GROUP_GET_INFO
         vduname = [node for node in kwargs['vdus'] if fnmatchcase(node, 'VDU*')]
-        mgmt_ip =  kwargs['vdus'][vduname[0]]['mgmt_ip']
-        zbx_admin_passwd= kwargs['vdus'][vduname[0]]['parameters']['zabbix_admin_passwd']
 
-        zabbix_server_ip =kwargs['vdus'][vduname[0]]['parameters']['zabbix_server_ip']
 
-        # 1. create TEMPLATE(ITEM, TRIGGER,ACTION)
-        tempid,servicetgrid,servicetgrname = self.create_template(kwargs,token,vduname)
+        for vdu in vduname:
+            print("###########################################################################3")
+            print("###########################################################################3")
+            print("###########################################################################3")
+            print("###########################################################################3")
+            print("###########################################################################3")
+            print("###########################################################################3")
+            print("FIRST VDU NAME :",vdu)
+            print("###########################################################################3")
+            print("###########################################################################3")
+            print("###########################################################################3")
+            print("###########################################################################3")
+            print("###########################################################################3")
+            print("###########################################################################3")
 
+            mgmt_ip =  kwargs['vdus'][vdu]['mgmt_ip']
+            zbx_admin_passwd= kwargs['vdus'][vdu]['parameters']['zabbix_admin_passwd']
+            zabbix_server_ip =kwargs['vdus'][vdu]['parameters']['zabbix_server_ip']
+            # 1. create TEMPLATE(ITEM, TRIGGER,ACTION)
+            tempid,serviceid,cmdname,servicename = self.create_template(kwargs,token,vdu)
         # 2. create host
-        print("########################################################")
-        print("########################################################")
-        print("########################################################")
-        print("Line 128 add_host_create_api in zabbix.py")
-        print("mgmt_ip : ",mgmt_ip)######")
-        print("########################################################")
+            print("########################################################")
+            print("########################################################")
+            print("########################################################")
+            print("Line 128 add_host_create_api in zabbix.py")
+            print("mgmt_ip : ",mgmt_ip)######")
+            print("########################################################")
 
+            GROUP_G_DICT['auth'] = token
+            print("zbx_admin_passwd : ", zbx_admin_passwd)
+            print("zabbix_server_ip : ", zabbix_server_ip)
+            print("########################################################")
+            print("########################################################")
+            print("########################################################")
 
-        GROUP_G_DICT['auth'] = token
-        print("zbx_admin_passwd : ", zbx_admin_passwd)
+            GROUP_G_DICT['auth'] = token
+            response = self.send_post(GROUP_G_DICT)
 
-        print("zabbix_server_ip : ", zabbix_server_ip)
-
-        print("########################################################")
-        print("########################################################")
-        print("########################################################")
-
-
-        GROUP_G_DICT['auth'] = token
-        response = self.send_post(GROUP_G_DICT)
-
-        print('response',response)
-        HOST_C_DICT['auth'] = token
-        HOST_C_DICT['params']['host'] = str(vduname[0]).lower()
-        HOST_C_DICT['params']['interfaces'][0]['ip'] = mgmt_ip
-        HOST_C_DICT['params']['templates'][0]['templateid'] = tempid
-        HOST_C_DICT['params']['groups'][0]['groupid']=response['result'][0]['groupid']
-        print('HOST_C_DICT',HOST_C_DICT)
-        response = self.send_post(HOST_C_DICT)
-        print('response',response)
-
-
-        response = self.create_action(token,servicetgrid,response['result']['hostids'],servicetgrname)
-        print('ACTION RESPONSE : ',response)
-
-
-
-
-
+            print('response',response)
+            HOST_C_DICT['auth'] = token
+            HOST_C_DICT['params']['host'] = str(vdu).lower()
+            HOST_C_DICT['params']['interfaces'][0]['ip'] = mgmt_ip
+            HOST_C_DICT['params']['templates'][0]['templateid'] = tempid
+            HOST_C_DICT['params']['groups'][0]['groupid']=response['result'][0]['groupid']
+            print('HOST_C_DICT',HOST_C_DICT)
+            response = self.send_post(HOST_C_DICT)
+            print('response',response)
+            response = self.create_action(token,serviceid,response['result']['hostids'],cmdname,servicename,vdu)
+            print('ACTION RESPONSE : ',response)
 
 
     def get_token_from_server(self):
