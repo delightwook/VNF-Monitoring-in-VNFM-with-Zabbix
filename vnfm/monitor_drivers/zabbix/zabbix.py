@@ -153,7 +153,13 @@ class VNFMonitorZabbix(extensions.PluginInterface):
         pass
 
     def send_post(self,query):
+        print("################ Send api#################")
+        print("API : ",json.dumps(query))
         response = requests.post(URL, headers=HEADERS, data=json.dumps(query))
+
+        print("##############Zabbix Response###############")
+        print("Zabbix Response : ",response.json())
+
         return dict(response.json())
 
     def create_graph(self,token,itemid,name):
@@ -530,6 +536,7 @@ class VNFMonitorZabbix(extensions.PluginInterface):
             print('response',response)
             response = self.create_action(token,serviceid,response['result']['hostids'],cmdname,servicename,vdu)
             print('ACTION RESPONSE : ',response)
+
 
 
     def get_token_from_server(self):

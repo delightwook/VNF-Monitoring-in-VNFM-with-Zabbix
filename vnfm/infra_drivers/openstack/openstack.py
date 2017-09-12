@@ -116,7 +116,6 @@ class OpenStack(abstract_driver.DeviceAbstractDriver,
         tth.generate_hot()
         stack = self._create_stack(heatclient, tth.vnf, tth.fields)
         return stack['stack']['id']
-
     @log.log
     def _create_stack(self, heatclient, vnf, fields):
         if 'stack_name' not in fields:
