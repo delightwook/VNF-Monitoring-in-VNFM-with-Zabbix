@@ -186,6 +186,14 @@ class VNFMonitorZabbix(extensions.PluginInterface):
         if str(vdu) not in ACTION_C_DICT['params']['name']:
             ACTION_C_DICT['params']['name'] +=str(vdu)
         ACTION_C_DICT['params']['operations'][0]['opcommand_hst'][0]['hostid'] = hostid[0]
+
+        print('##############################################')
+        print('##############################################')
+        print("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",servicename)
+        print('##############################################')
+        print('##############################################')
+        print("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",servicename)
+
         ACTION_C_DICT['params']['operations'][0]['opcommand']['command'] = str(ACTION_CMD_LIST[cmdname])+' ' +str(servicename)+' restart'
         ACTION_C_DICT['params']['filter']['conditions'][0]['value'] = triggerid[0]
         print('ACTION_C_DICT ',ACTION_C_DICT)
@@ -297,11 +305,13 @@ class VNFMonitorZabbix(extensions.PluginInterface):
                             cmdname = 'Service Health'
                             servicename = parameters['service'][item]
 
-
-
-
                         else:
                             # net.tcp.service[service,<ip>,<port>]
+                            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
                             temp='['+parameters['service'][item]+']'
                             ITEM_C_DICT['params']['name'] = 'Service Status Check'
                             ITEM_C_DICT['params']['key_'] = str(ITEM_KEY_LIST['Service Health'] +temp)
@@ -317,6 +327,7 @@ class VNFMonitorZabbix(extensions.PluginInterface):
                             print('response', response)
                             serviceid = response['result']['triggerids']
                             cmdname = 'Service Health'
+                            servicename = parameters['service'][item]
 
                             ###Call create_function
 
