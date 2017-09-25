@@ -13,9 +13,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import abc
-
-import six
 import json
 import requests
 from oslo_config import cfg
@@ -206,13 +203,7 @@ class VNFMonitorZabbix(extensions.PluginInterface):
         TRIGGER_C_DICT['auth'] =token
         TRIGGER_C_DICT['params'] = trigger_params
         TRIGGER_C_DICT['templateid']=templateid
-        print('##############################################')
-        print('##############################################')
-        print("TRIGGER_C_DICTTRIGGER_C_DICTTRIGGER_C_DICT",TRIGGER_C_DICT)
         response = self.send_post(TRIGGER_C_DICT)
-        print("response : ",response)
-        print('##############################################')
-        print('##############################################')
         return response
 
 
@@ -236,13 +227,7 @@ class VNFMonitorZabbix(extensions.PluginInterface):
         maximum_cpu_load_usage = parameters['maximum_cpu_load_usage']
         maximum_pro_memory_usage = parameters['service']['maximum_pro_memory_usage']
 
-        print('##############################################')
-        print('##############################################')
 
-        print('SERVICE PARAMETERS :',parameters['service'])
-
-        print('##############################################')
-        print('##############################################')
         trigger_params = []
 
         serviceid = None
@@ -263,13 +248,6 @@ class VNFMonitorZabbix(extensions.PluginInterface):
 
 
         trigger_params.append(TRIGGER_P_DICT['Agent Status'][0])
-
-        print('##############################################')
-        print('##############################################')
-        print('TRIGGER_P_DICT[Agent Status] : ',TRIGGER_P_DICT['Agent Status'])
-        print('trigger_params : ', trigger_params)
-        print('##############################################')
-        print('##############################################')
 
         # Network Status
         temp = '[' + 'ens3' + ']'
@@ -306,12 +284,6 @@ class VNFMonitorZabbix(extensions.PluginInterface):
                             servicename = parameters['service'][item]
 
                         else:
-                            # net.tcp.service[service,<ip>,<port>]
-                            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
                             temp='['+parameters['service'][item]+']'
                             ITEM_C_DICT['params']['name'] = 'Service Status Check'
                             ITEM_C_DICT['params']['key_'] = str(ITEM_KEY_LIST['Service Health'] +temp)
@@ -435,21 +407,6 @@ class VNFMonitorZabbix(extensions.PluginInterface):
 
         server_token = token
 
-        print("###########################################################################3")
-        print("###########################################################################3")
-        print("###########################################################################3")
-        print("###########################################################################3")
-        print("###########################################################################3")
-        print("###########################################################################3")
-        print("TEMP_C_DICT :", TEMP_C_DICT)
-        print("TEMP_CREATE_DICT :", TEMP_CREATE_DICT)
-        print("###########################################################################3")
-        print("###########################################################################3")
-        print("###########################################################################3")
-        print("###########################################################################3")
-        print("###########################################################################3")
-        print("###########################################################################3")
-        # 1. create template
         if str(vduname) not in TEMP_C_DICT['params']['host']:
             TEMP_C_DICT['params']['host'] += str(vduname)
         TEMP_C_DICT['auth'] = server_token
@@ -459,25 +416,6 @@ class VNFMonitorZabbix(extensions.PluginInterface):
         tmpid= temp_create_response['result']['templateids'][0]
 
 
-        #Call Create ITEM FUNCTION
-
-
-
-        print("###########################################################################3")
-        print("###########################################################################3")
-        print("###########################################################################3")
-        print("###########################################################################3")
-        print("###########################################################################3")
-        print("###########################################################################3")
-        print("TEMP_C_DICT :", TEMP_C_DICT)
-        print("TEMP_CREATE_DICT :", TEMP_CREATE_DICT)
-        print("###########################################################################3")
-        print("###########################################################################3")
-        print("###########################################################################3")
-        print("###########################################################################3")
-        print("###########################################################################3")
-        print("###########################################################################3")
-        # 1. create template
         serviceid,servicename,cmdname = self.create_item(parameters, token, vduname, tmpid,TEMP_C_DICT['params']['host'])
 
 
@@ -499,39 +437,13 @@ class VNFMonitorZabbix(extensions.PluginInterface):
 
 
         for vdu in vduname:
-            print("###########################################################################3")
-            print("###########################################################################3")
-            print("###########################################################################3")
-            print("###########################################################################3")
-            print("###########################################################################3")
-            print("###########################################################################3")
-            print("FIRST VDU NAME :",vdu)
-            print("###########################################################################3")
-            print("###########################################################################3")
-            print("###########################################################################3")
-            print("###########################################################################3")
-            print("###########################################################################3")
-            print("###########################################################################3")
-
             mgmt_ip =  kwargs['vdus'][vdu]['mgmt_ip']
             zbx_admin_passwd= kwargs['vdus'][vdu]['parameters']['zabbix_admin_passwd']
             zabbix_server_ip =kwargs['vdus'][vdu]['parameters']['zabbix_server_ip']
             # 1. create TEMPLATE(ITEM, TRIGGER,ACTION)
             tempid,serviceid,cmdname,servicename = self.create_template(kwargs,token,vdu)
-        # 2. create host
-            print("########################################################")
-            print("########################################################")
-            print("########################################################")
-            print("Line 128 add_host_create_api in zabbix.py")
-            print("mgmt_ip : ",mgmt_ip)######")
-            print("########################################################")
 
             GROUP_G_DICT['auth'] = token
-            print("zbx_admin_passwd : ", zbx_admin_passwd)
-            print("zabbix_server_ip : ", zabbix_server_ip)
-            print("########################################################")
-            print("########################################################")
-            print("########################################################")
 
             GROUP_G_DICT['auth'] = token
             response = self.send_post(GROUP_G_DICT)
@@ -554,17 +466,6 @@ class VNFMonitorZabbix(extensions.PluginInterface):
         # reponse = requests.post(URL,headers=HEADERS,data=json.dumps(INFO))
         response = requests.post(URL, headers=HEADERS, data=json.dumps(AUTHINFO))
         response_dict = dict(response.json())
-
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 87 conntect_to_server in zabbix.py")
-        print("repose : ", response.status_code)
-        print("repose.token: ",response_dict['result'])
-        print("repose.token: ", type(response_dict))
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
         return response.status_code,response_dict['result']
 
 
@@ -574,15 +475,6 @@ class VNFMonitorZabbix(extensions.PluginInterface):
     def add_to_svcmonitor(self, vnf, kwargs):
         status_code,token = self.get_token_from_server()
         self.add_host_create_api(kwargs,token)
-
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 141 add_to_svcmonitot in zabbix.py")
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-
 
     def monitor_call(self, vnf, kwargs):
         pass

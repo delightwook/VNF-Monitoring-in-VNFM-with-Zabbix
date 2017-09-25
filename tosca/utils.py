@@ -91,16 +91,6 @@ HEAT_RESOURCE_MAP = {
 def updateimports(template):
     path = os.path.dirname(os.path.abspath(__file__)) + '/lib/'
     defsfile = path + 'tacker_defs.yaml'
-    print("###################################################")
-    print("###################################################")
-    print("###################################################")
-    print("Line 93  updateimports in utils.py")
-    print("defsfile", defsfile)
-    print("###################################################")
-    print("###################################################")
-    print("###################################################")
-    print("\n")
-    print("\n")
 
     if 'imports' in template:
         template['imports'].append(defsfile)
@@ -111,16 +101,6 @@ def updateimports(template):
         nfvfile = path + 'tacker_nfv_defs.yaml'
 
         template['imports'].append(nfvfile)
-    print("###################################################")
-    print("###################################################")
-    print("###################################################")
-    print("Line 113  updateimports in utils.py")
-    print("template", template)
-    print("###################################################")
-    print("###################################################")
-    print("###################################################")
-    print("\n")
-    print("\n")
 
     LOG.debug(path)
 
@@ -162,16 +142,6 @@ def check_for_substitution_mappings(template, params):
 
 @log.log
 def get_vdu_monitoring(template):
-    print("###################################################")
-    print("###################################################")
-    print("###################################################")
-    print("Line 144 get_vnd_monitoring in util.py")
-    print("template", template)
-    print("###################################################")
-    print("###################################################")
-    print("###################################################")
-    print("\n")
-    print("\n")
 
     monitoring_dict = dict()
     policy_dict = dict()
@@ -179,16 +149,6 @@ def get_vdu_monitoring(template):
     for nt in template.nodetemplates:
         if nt.type_definition.is_derived_from(TACKERVDU):
             mon_policy = nt.get_property_value('monitoring_policy') or 'noop'
-            print("###################################################")
-            print("###################################################")
-            print("###################################################")
-            print("Line 194 get_vnd_monitoring in util.py")
-            print("mon_policy", mon_policy)
-            print("###################################################")
-            print("###################################################")
-            print("###################################################")
-            print("\n")
-            print("\n")
             if mon_policy != 'noop':
                 if 'parameters' in mon_policy:
                     mon_policy['monitoring_params'] = mon_policy['parameters']
@@ -209,16 +169,6 @@ def get_vdu_servicemonitoring(template):
     for vdu in vdunode:
             if 'service_monitoring_policy' in template['topology_template']['node_templates'][vdu]['properties']:
                 mon_policy = template['topology_template']['node_templates'][vdu]['properties']['service_monitoring_policy']
-                print("###################################################")
-                print("###################################################")
-                print("###################################################")
-                print("Line 211 get_vnd_servicemonitoring in util.py")
-                print("mon_policy", mon_policy)
-                print("###################################################")
-                print("###################################################")
-                print("###################################################")
-                print("\n")
-                print("\n")
                 if 'parameters' in mon_policy:
                     mon_policy['monitoring_params'] = mon_policy['parameters']
                 policy_dict['vdus'][vdu]={}

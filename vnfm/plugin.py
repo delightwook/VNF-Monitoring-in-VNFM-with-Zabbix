@@ -190,17 +190,6 @@ class VNFMPlugin(vnfm_db.VNFMPluginDb, VNFMMgmtMixin):
         if vnfd_yaml is None:
             return
 
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 194 _parse_template_input in plugin.py")
-        print("vnfd",vnfd)
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("\n")
-        print("\n")
-
         inner_vnfd_dict = yaml.safe_load(vnfd_yaml)
         LOG.debug('vnfd_dict: %s', inner_vnfd_dict)
 
@@ -236,25 +225,9 @@ class VNFMPlugin(vnfm_db.VNFMPluginDb, VNFMMgmtMixin):
         ##########################################################################################
 
     def add_vnf_to_svcmonitor(self,context,vnf_dict):
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 487 add_vnf_to_monitor in plugin.py")
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
+
         svcmonitoring_dict = self._vnf_svcmonitor.create_vnf_service_dict(context,vnf_dict)
 
-
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 245 add_vnf_to_svcmonior in plugin.py")
-        print("svcmonitoring_dict",svcmonitoring_dict)
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("\n")
         print("\n")
         self._vnf_svcmonitor.add_to_svcmonitor(svcmonitoring_dict,vnf_dict)
 
@@ -342,14 +315,7 @@ class VNFMPlugin(vnfm_db.VNFMPluginDb, VNFMMgmtMixin):
             return
 
         vnf_dict['mgmt_url'] = mgmt_url
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 348 create_vnfin plugin.py")
-        print("vnf_dict['mgmt_url']", vnf_dict['mgmt_url'])
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
+
 
         kwargs = {
             mgmt_constants.KEY_ACTION: mgmt_constants.ACTION_CREATE_VNF,
@@ -453,14 +419,7 @@ class VNFMPlugin(vnfm_db.VNFMPluginDb, VNFMMgmtMixin):
             print("",vnf_dict['attributes'])
 
             if 'service_monitoring_policy' in vnf_dict['attributes']:
-                print("###################################################")
-                print("###################################################")
-                print("###################################################")
-                print("Line 487 add_vnf_to_monitor in plugin.py")
-                print("vnf_dict.keys() ::: ", vnf_dict['attributes'].keys())
-                print("###################################################")
-                print("###################################################")
-                print("###################################################")
+
                 self.add_vnf_to_svcmonitor(context, vnf_dict)
             if vnf_dict['status'] is not constants.ERROR:
                 self.add_vnf_to_monitor(context, vnf_dict)
@@ -738,16 +697,7 @@ class VNFMPlugin(vnfm_db.VNFMPluginDb, VNFMMgmtMixin):
         p['vnf'] = vnf
         p['name'] = name
         p['id'] = p['name']
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 706 __make_policy_dcit in plugin.py")
-        print("policy", policy)
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("\n")
-        print("\n")
+
         return p
 
     def get_vnf_policies(
@@ -784,16 +734,7 @@ class VNFMPlugin(vnfm_db.VNFMPluginDb, VNFMMgmtMixin):
         policies = self.get_vnf_policies(context,
                                          vnf_id,
                                          filters={'name': policy_id})
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 752 __make_policy_dcit in plugin.py")
-        print("policies", policies)
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("\n")
-        print("\n")
+
         if policies:
             return policies[0]
 
@@ -871,17 +812,6 @@ class VNFMPlugin(vnfm_db.VNFMPluginDb, VNFMMgmtMixin):
 
     def _handle_vnf_monitoring(self, context, trigger):
 
-
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 820 _handle_vnf-Monitoring in plugin.py")
-        print("trigger",trigger)
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("\n")
-        print("\n")
 
         vnf_dict = trigger['vnf']
         if trigger['action_name'] in constants.DEFAULT_ALARM_ACTIONS:

@@ -104,15 +104,7 @@ class OpenStack(abstract_driver.DeviceAbstractDriver,
         print("\n")
 
         tth = translate_template.TOSCAToHOT(vnf, heatclient)
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 110 create in openstack.py")
-        print("tth", tth)
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("\n")
+
         tth.generate_hot()
         stack = self._create_stack(heatclient, tth.vnf, tth.fields)
         return stack['stack']['id']

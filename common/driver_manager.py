@@ -67,11 +67,6 @@ class DriverManager(object):
 
     def invoke(self, type_, method_name, **kwargs):
         driver = self._drivers[type_]
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 73 invoke in driver_manager.py")
-        print("self._drivers[type_]  : ",driver )
         return getattr(driver, method_name)(**kwargs)
 
     def __getitem__(self, type_):

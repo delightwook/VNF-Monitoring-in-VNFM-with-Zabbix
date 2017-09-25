@@ -74,35 +74,17 @@ class TOSCAToHOT(object):
         self._get_vnfd()
         dev_attrs = self._update_fields()
         vnfd_dict = yamlparser.simple_ordered_parse(self.vnfd_yaml)
-
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 79 generate_hot in translate_template.py")
-        # print("properties", vnfd_dict['topology_template']['node_templates']['VDU1']['properties']['service_monitoring_policy'])
-        print("vnf :::: ", self.vnf)
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("\n")
         ####### VNF DICT is Orderded_dict
         LOG.debug('vnfd_dict %s', vnfd_dict)
         self._get_unsupported_resource_props(self.heatclient)
-        print("###################It ia Nor1#######################")
+
 
         is_tosca_format = False
         self._generate_hot_from_tosca(vnfd_dict, dev_attrs)
-        print("###################It ia Nor1#######################")
+
         is_tosca_format = True
-        print("###################It ia Nor2#######################")
+
         self.fields['template'] = self.heat_template_yaml
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("###################It ia Nor#######################")
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
         print("\n")
         if is_tosca_format:
             self._handle_policies(vnfd_dict)
@@ -126,15 +108,6 @@ class TOSCAToHOT(object):
     @log.log
     def _update_fields(self):
         attributes = self.attributes
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 117 _update_fileds in translate_template.py")
-        print("attributes", attributes)
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("\n")
         fields = dict((key, attributes.pop(key)) for key
                       in ('stack_name', 'template_url', 'template')
                       if key in attributes)
@@ -154,16 +127,6 @@ class TOSCAToHOT(object):
 
         self.attributes = attributes
         self.fields = fields
-
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 147 _update_fileds in translate_template.py")
-        print("dev_attrs", dev_attrs)
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("\n")
 
         return dev_attrs
 
@@ -317,16 +280,6 @@ class TOSCAToHOT(object):
         unsupported_resource_props = {}
 
         for res, prop_dict in (HEAT_VERSION_INCOMPATIBILITY_MAP).items():
-            print("###################################################")
-            print("###################################################")
-            print("###################################################")
-            print("Line 320 _get_unsupported_resource_props in translate_template")
-            print("res", res)
-            print("prop_dict", prop_dict)
-            print("###################################################")
-            print("###################################################")
-            print("###################################################")
-            print("\n")
             unsupported_props = {}
             for prop, val in (prop_dict).items():
                 if not heat_client.resource_attr_support(res, prop):
@@ -334,7 +287,7 @@ class TOSCAToHOT(object):
             if unsupported_props:
                 unsupported_resource_props[res] = unsupported_props
         self.unsupported_props = unsupported_resource_props
-        print("###################  _get_unsupported_resource_props in translate_template End#######################")
+
 
     @log.log
     def _generate_hot_from_tosca(self, vnfd_dict, dev_attrs):
@@ -346,21 +299,6 @@ class TOSCAToHOT(object):
             except Exception as e:
                 LOG.debug("Params not Well Formed: %s", str(e))
                 raise vnfm.ParamYAMLNotWellFormed(error_msg_details=str(e))
-
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 297  _generate_hot_from_tosca in translate_template.py")
-        print("vnfd_dict.keys", vnfd_dict.keys())
-        print("vnfd_dict", vnfd_dict['topology_template']['node_templates'].keys())
-
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("\n")
-        print("\n")
-
-        ################# Create Service Monitoring Dict and, Delete Monitoring Dict in vnfd_dict
 
         svcmonitoring_dict,vnfd_dicttemp = toscautils.get_vdu_servicemonitoring(vnfd_dict)
         toscautils.updateimports(vnfd_dicttemp)
@@ -380,89 +318,16 @@ class TOSCAToHOT(object):
             raise vnfm.ToscaParserFailed(error_msg_details=str(e))
 
         metadata = toscautils.get_vdu_metadata(tosca)
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 376  _generate_hot_from_tosca in translate_template.py")
-        #####################No Failure#############################
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("\n")
-        print("\n")
         monitoring_dict = toscautils.get_vdu_monitoring(tosca)
 
-
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 388 _generate_hot from tosca in translate_template.py")
-        #####################No Failure#############################
-        print("monitoring_dict :",monitoring_dict)
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("\n")
-        print("\n")
         mgmt_ports = toscautils.get_mgmt_ports(tosca)
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 401 _generate_hot from tosca in translate_template.py")
-        #####################No Failure#############################
-        print("mgmt_ports",mgmt_ports)
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("\n")
-        print("\n")
-
         res_tpl = toscautils.get_resources_dict(tosca,self.STACK_FLAVOR_EXTRA)
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 414 _generate_hot from tosca inz translate_template.py")
-        #####################No Failure#############################
-        print("res_tpl : ",res_tpl)
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("\n")
-        print("\n")
-
-
 
         toscautils.post_process_template(tosca)
-        print("###################################################")
-        print("#################Line 423 Is Here Failure ? : N ##############")
-        print("###################################################")
 
         try:
             translator = tosca_translator.TOSCATranslator(tosca,parsed_params)
-            print("###################################################")
-            print("#################Line 430  Is Here Failure ? : N ##############")
-            print("###################################################")
-
-
-            ############################# Here Originate Error############
-            ############################# End Except Error ###############
             heat_template_yaml = translator.translate()
-            ############################# Here Originate Error############
-            ############################# End Except Error ###############
-
-
-            print("###################################################")
-            print("###################################################")
-            print("###################################################")
-            print("Line459 _generate_hot from tosca in translate_template.py")
-            print("heat_template_yaml : ", heat_template_yaml)
-            print("####################END############################")
-            print("###################################################")
-            print("###################################################")
-            print("###################################################")
-            print("\n")
 
         except Exception as e:
             LOG.debug("heat-translator error: %s", str(e))
@@ -477,17 +342,6 @@ class TOSCAToHOT(object):
         self.monitoring_dict = monitoring_dict
         self.svcmonitoring_dict = svcmonitoring_dict
         self.metadata = metadata
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line484 _generate_hot from tosca in translate_template.py")
-        print("####################END############################")
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("\n")
-        print("\n")
-
     @log.log
     def _generate_hot_scaling(self, vnfd_dict,
                               scale_resource_type="OS::Nova::Server"):

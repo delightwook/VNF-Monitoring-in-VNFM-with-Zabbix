@@ -100,16 +100,6 @@ class VNFMonitor(object):
 
             with self._lock:
                 for hosting_vnf in self._hosting_vnfs.values():
-                    print("###################################################")
-                    print("###################################################")
-                    print("###################################################")
-                    print("Line 102 VNFMotoring class __run__ in monitor.py")
-                    print("hosting_vnf:", hosting_vnf)
-                    print("###################################################")
-                    print("###################################################")
-                    print("###################################################")
-                    print("\n")
-                    print("\n")
                     if hosting_vnf.get('dead', False):
                         LOG.debug('monitor skips dead vnf %s', hosting_vnf)
                         continue
@@ -118,16 +108,6 @@ class VNFMonitor(object):
 
     @staticmethod
     def to_hosting_vnf(vnf_dict, action_cb):
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 120 to_hosting_vnf in monitor.py")
-        print("action_cb", action_cb)
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("\n")
-        print("\n")
         return {
             'id': vnf_dict['id'],
             'management_ip_addresses': jsonutils.loads(
@@ -174,18 +154,6 @@ class VNFMonitor(object):
                 return
 
             policy = vdupolicies[vdu]
-            print("###################################################")
-            print("###################################################")
-            print("###################################################")
-            print("Line 179 _invoke monitoring in monitor.py")
-            print("driver:", policy)
-            print("###################################################")
-            print("###################################################")
-            print("###################################################")
-            print("\n")
-            print("\n")
-
-
             for driver in policy.keys():
                 params = policy[driver].get('monitoring_params', {})
 
@@ -205,17 +173,6 @@ class VNFMonitor(object):
                                                   params)
 
                 LOG.debug('driver_return %s', driver_return)
-                print("###################################################")
-                print("###################################################")
-                print("###################################################")
-                print("Line 185 __run__monitoring in monitor.py")
-                print("driver:", driver)
-                print("###################################################")
-                print("###################################################")
-                print("###################################################")
-                print("\n")
-                print("\n")
-
                 if driver_return in actions:
                     action = actions[driver_return]
                     hosting_vnf['action_cb'](action)
@@ -226,17 +183,6 @@ class VNFMonitor(object):
 
     def _invoke(self, driver, **kwargs):
         method = inspect.stack()[1][3]
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 221 _invoke monitoring in monitor.py")
-        print("driver:", driver)
-        print("inspect.stack()", method)
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("\n")
-        print("\n")
         return self._monitor_manager.invoke(
             driver, method, **kwargs)
 
@@ -249,28 +195,8 @@ class VNFMonitor(object):
             vnf_dict, monitor=self, vnf=vnf_dict)
 
     def monitor_call(self, driver, vnf_dict, kwargs):
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 243 monitor_call monitoring in monitor.py")
-        print("driver:", driver,vnf_dict,kwargs)
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("\n")
-        print("\n")
         return self._invoke(driver,
                             vnf=vnf_dict, kwargs=kwargs)
-
-#####################################################################################
-###################################VNF Service Monitoring Class######################
-#####################################################################################
-# This class is Service Monitoring Class
-# All driver is using this common class
-# if zabbix , this class is calling zabbix driver
-# other monitoring tool , this class is calling zabbix driver
-
-
 
 class VNFServiceMonitor(object):
     """VNF Service monitor"""
@@ -288,12 +214,6 @@ class VNFServiceMonitor(object):
         self._service_monitor_manager = driver_manager.DriverManager(
             'tacker.tacker.service_monitor.drivers',
             cfg.CONF.tacker.service_monitor_driver)
-        ################# We should think about Thread if speed is too slow#####################################
-        ################# We should think about Thread if speed is too slow#####################################
-        ################# We should think about Thread if speed is too slow#####################################
-        ################# We should think about Thread if speed is too slow#####################################
-        # threading.Thread(target=self.add_to_svcmonitor).start()
-
 
     def _create_service_monitoring_dict(self,dev_attrs, mgmt_url):
         svcmonitoring_dict = ast.literal_eval(dev_attrs['service_monitoring_policy'])
@@ -306,64 +226,20 @@ class VNFServiceMonitor(object):
     def create_vnf_service_dict(self, context,vnf_dict):
         dev_attrs = vnf_dict['attributes']
         mgmt_url = vnf_dict['mgmt_url']
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 307 _invoke monitoring in monitor.py")
-        print("vnf_dict.keys()", vnf_dict.keys())
-        print("mgmt_url ",mgmt_url)
-        print("id", vnf_dict['id'])
-        print("dev_attrs", dev_attrs)
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("\n")
-        print("\n")
         return self._create_service_monitoring_dict(dev_attrs,mgmt_url)
 
     def _invoke(self, driver, **kwargs):
         method = inspect.stack()[1][3]
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 2327 add_to_zabbix in monitor.py")
-        print("method : ",method)
-        print("inspect.stack() : ",inspect.stack())
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("\n")
         return self._service_monitor_manager.invoke(driver, method, **kwargs)
 
     def add_to_svcmonitor(self, servicevnfdict,vnf_dict):
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("Line 2327 add_to_zabbix in monitor.py")
-        ################# We need Change Multi VDU#####################################
-        ################# We need Change Multi VDU#####################################
-        ################# We need Change Multi VDU#####################################
-        ################# We need Change Multi VDU#####################################
-
         vdunode = [node for node in servicevnfdict['vdus'] if fnmatchcase(node, 'VDU*')]
 
         driver = servicevnfdict['vdus'][vdunode[0]]['name']
         print("servicevnfdict.keys()", servicevnfdict['vdus'][vdunode[0]]['name'])
 
-        ################# We need Change Multi VDU#####################################
-        ################# We need Change Multi VDU#####################################
-        ################# We need Change Multi VDU#####################################
-        ################# We need Change Multi VDU#####################################
-
-
         kwargs = servicevnfdict
         print("inspect.stack()", inspect.stack())
-        print("servicevnfdict.keys()", servicevnfdict['vdus'])
-        print("###################################################")
-        print("###################################################")
-        print("###################################################")
-        print("\n")
-        print("\n")
         return self._invoke(driver,vnf=vnf_dict, kwargs=kwargs)
 
 
