@@ -1,0 +1,37 @@
+{
+    "vims": [
+        {
+            "status": "REACHABLE",
+            "description": "",
+            "tenant_id": "a5346a4d3c464b4f8776ee2f4bfb86af",
+            "created_at": "2018-06-17 16:26:52",
+            "vim_project": {
+                "name": "nfv",
+                "project_domain_name": "Default"
+            },
+            "updated_at": "2018-06-18 03:45:49",
+            "is_default": true,
+            "auth_url": "http://192.168.42.131/identity/v3",
+            "placement_attr": {
+                "regions": [
+                    "RegionOne"
+                ]
+            },
+            "auth_cred": {
+                "username": "nfv_user",
+                "password": "***",
+                "project_name": "nfv",
+                "cert_verify": "True",
+                "user_domain_name": "Default",
+                "auth_url": "http://192.168.42.131/identity/v3",
+                "project_id": null,
+                "key_type": "barbican_key",
+                "secret_uuid": "***",
+                "project_domain_name": "Default"
+            },
+            "type": "openstack",
+            "id": "cb7ac02e-1445-48c2-a3cb-4fcddd49fce5",
+            "name": "VIM0"
+        }
+    ]
+}

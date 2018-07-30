@@ -1,0 +1,16 @@
+{
+    "vim": {
+        "auth_cred": {
+            "username": "new_nfv_user",
+            "user_domain_name": "NewDomain",
+            "password": "newpassword",
+            "cert_verify": "True"
+        },
+        "vim_project": {
+            "name": "new_nfv",
+            "project_domain_name": "NewDomain"
+        },
+        "name": "new_VIM1",
+        "description": "New Description"
+    }
+}

@@ -1,0 +1,465 @@
+#!/bin/bash
+#
+# lib/tacker
+# functions - functions specific to tacker
+
+# Dependencies:
+# ``functions`` file
+# ``DEST`` must be defined
+# ``STACK_USER`` must be defined
+
+# ``stack.sh`` calls the entry points in this order:
+#
+# - install_tacker
+# - configure_tacker
+# - create_tacker_accounts
+# - init_tacker
+# - start_tacker
+# - tacker_horizon_install
+# - tacker_create_initial_network
+
+#
+# ``unstack.sh`` calls the entry points in this order:
+#
+# - stop_tacker
+# - cleanup_tacker
+
+# Tacker
+# ---------------
+
+# Save trace setting
+XTRACE=$(set +o | grep xtrace)
+set +o xtrace
+
+# Defaults
+# --------
+
+# Set up default directories
+GITREPO["tacker-horizon"]=${TACKERHORIZON_REPO:-${GIT_BASE}/openstack/tacker-horizon.git}
+GITBRANCH["tacker-horizon"]=${TACKERHORIZON_BRANCH:-master}
+GITDIR["tacker-horizon"]=$DEST/tacker-horizon
+
+TACKER_DIR=$DEST/tacker
+TACKER_AUTH_CACHE_DIR=${TACKER_AUTH_CACHE_DIR:-/var/cache/tacker}
+
+# Support entry points installation of console scripts
+if [[ -d $TACKER_DIR/bin/tacker-server ]]; then
+    TACKER_BIN_DIR=$TACKER_DIR/bin
+else
+    TACKER_BIN_DIR=$(get_python_exec_prefix)
+fi
+
+TACKER_CONF_DIR=/etc/tacker
+TACKER_CONF=$TACKER_CONF_DIR/tacker.conf
+
+TACKER_LOG_DIR=/var/log/tacker
+TACKER_SERVER_LOG=$TACKER_LOG_DIR/tacker-server.log
+
+# Default name for Tacker database
+TACKER_DB_NAME=${TACKER_DB_NAME:-tacker}
+# Default Tacker Port
+TACKER_PORT=${TACKER_PORT:-9890}
+# Default Tacker Host
+TACKER_HOST=${TACKER_HOST:-$SERVICE_HOST}
+# Default protocol
+TACKER_PROTOCOL=${TACKER_PROTOCOL:-$SERVICE_PROTOCOL}
+# Default admin username
+TACKER_ADMIN_USERNAME=${TACKER_ADMIN_USERNAME:-tacker}
+# Default auth strategy
+TACKER_AUTH_STRATEGY=${TACKER_AUTH_STRATEGY:-keystone}
+TACKER_USE_ROOTWRAP=${TACKER_USE_ROOTWRAP:-True}
+
+TACKER_RR_CONF_FILE=$TACKER_CONF_DIR/rootwrap.conf
+if [[ "$TACKER_USE_ROOTWRAP" == "False" ]]; then
+    TACKER_RR_COMMAND="sudo"
+else
+    TACKER_ROOTWRAP=$(get_rootwrap_location tacker)
+    TACKER_RR_COMMAND="sudo $TACKER_ROOTWRAP $TACKER_RR_CONF_FILE"
+fi
+
+TACKER_NOVA_URL=${TACKER_NOVA_URL:-http://127.0.0.1:8774/v2}
+TACKER_NOVA_CA_CERTIFICATES_FILE=${TACKER_NOVA_CA_CERTIFICATES_FILE:-}
+TACKER_NOVA_API_INSECURE=${TACKER_NOVA_API_INSECURE:-False}
+
+HEAT_CONF_DIR=/etc/heat
+
+source ${TACKER_DIR}/tacker/tests/contrib/post_test_hook_lib.sh
+
+# Functions
+# ---------
+# Test if any Tacker services are enabled
+# is_tacker_enabled
+function is_tacker_enabled {
+    [[ ,${ENABLED_SERVICES} =~ ,"tacker" ]] && return 0
+    return 1
+}
+
+# create_tacker_cache_dir() - Part of the _tacker_setup_keystone() process
+function create_tacker_cache_dir {
+    # Create cache dir
+    sudo install -d -o $STACK_USER $TACKER_AUTH_CACHE_DIR
+    rm -f $TACKER_AUTH_CACHE_DIR/*
+}
+
+# create_tacker_accounts() - Set up common required tacker accounts
+
+# Tenant               User       Roles
+# ------------------------------------------------------------------
+# service              tacker    admin        # if enabled
+
+# Migrated from keystone_data.sh
+function create_tacker_accounts {
+    if is_service_enabled tacker; then
+        create_service_user "tacker"
+        get_or_create_role "advsvc"
+        create_service_user "tacker" "advsvc"
+
+        local tacker_service=$(get_or_create_service "tacker" \
+            "nfv-orchestration" "Tacker NFV Orchestration Service")
+        get_or_create_endpoint $tacker_service \
+            "$REGION_NAME" \
+            "$TACKER_PROTOCOL://$SERVICE_HOST:$TACKER_PORT/" \
+            "$TACKER_PROTOCOL://$SERVICE_HOST:$TACKER_PORT/" \
+            "$TACKER_PROTOCOL://$SERVICE_HOST:$TACKER_PORT/"
+    fi
+}
+
+# stack.sh entry points
+# ---------------------
+
+# init_tacker() - Initialize databases, etc.
+function init_tacker {
+    recreate_database $TACKER_DB_NAME
+
+    # Run Tacker db migrations
+    $TACKER_BIN_DIR/tacker-db-manage --config-file $TACKER_CONF upgrade head
+}
+
+# install_tacker() - Collect source and prepare
+function install_tacker {
+    setup_develop $TACKER_DIR
+}
+
+function start_tacker {
+    local cfg_file_options="--config-file $TACKER_CONF"
+    local service_port=$TACKER_PORT
+    local service_protocol=$TACKER_PROTOCOL
+
+    # Start tacker conductor
+    run_process tacker-conductor "$TACKER_BIN_DIR/tacker-conductor $cfg_file_options"
+    # Start the Tacker service
+    sudo cp $TACKER_DIR/etc/systemd/system/tacker.service /etc/systemd/system/devstack@tacker.service
+    sudo systemctl enable devstack@tacker.service
+    sudo systemctl restart devstack@tacker.service
+    echo "Waiting for Tacker to start..."
+    if ! timeout $SERVICE_TIMEOUT sh -c "while ! wget --no-proxy -q -O- $service_protocol://$TACKER_HOST:$service_port; do sleep 1; done"; then
+        die $LINENO "Tacker did not start"
+    fi
+}
+
+# stop_tacker() - Stop running processes (non-screen)
+function stop_tacker {
+    stop_process tacker
+    stop_process tacker-conductor
+}
+
+# cleanup_tacker() - Remove residual data files, anything left over from previous
+# runs that a clean run would need to clean up
+function cleanup_tacker {
+    sudo rm -rf $TACKER_AUTH_CACHE_DIR
+}
+
+
+function _create_tacker_conf_dir {
+    # Put config files in ``TACKER_CONF_DIR`` for everyone to find
+    sudo install -d -o $STACK_USER $TACKER_CONF_DIR
+}
+
+function _create_tacker_log_dir {
+    # Create Tacker LOG DIR
+    sudo install -d -o $STACK_USER $TACKER_LOG_DIR
+}
+
+# configure_tacker()
+# Set common config for all tacker server and agents.
+function configure_tacker {
+    _create_tacker_conf_dir
+    _create_tacker_log_dir
+
+    cd $TACKER_DIR
+    ./tools/generate_config_file_sample.sh
+    cd -
+
+    cp $TACKER_DIR/etc/tacker/tacker.conf.sample $TACKER_CONF
+
+    iniset_rpc_backend tacker $TACKER_CONF
+
+    iniset $TACKER_CONF database connection `database_connection_url $TACKER_DB_NAME`
+    iniset $TACKER_CONF DEFAULT state_path $DATA_DIR/tacker
+    iniset $TACKER_CONF DEFAULT use_syslog $SYSLOG
+
+    # Format logging
+    if [ "$LOG_COLOR" == "True" ] && [ "$SYSLOG" == "False" ]; then
+        setup_colorized_logging $TACKER_CONF DEFAULT project_id
+    else
+        # Show user_name and project_name by default like in nova
+        iniset $TACKER_CONF DEFAULT logging_context_format_string "%(asctime)s.%(msecs)03d %(levelname)s %(name)s [%(request_id)s %(user_name)s %(project_name)s] %(instance)s%(message)s"
+    fi
+
+    # server
+    TACKER_API_PASTE_FILE=$TACKER_CONF_DIR/api-paste.ini
+    TACKER_POLICY_FILE=$TACKER_CONF_DIR/policy.json
+
+    cp $TACKER_DIR/etc/tacker/api-paste.ini $TACKER_API_PASTE_FILE
+    cp $TACKER_DIR/etc/tacker/policy.json $TACKER_POLICY_FILE
+
+    # allow tacker user to administer tacker to match tacker account
+    sed -i 's/"context_is_admin":  "role:admin"/"context_is_admin":  "role:admin or user_name:tacker"/g' $TACKER_POLICY_FILE
+
+    iniset $TACKER_CONF DEFAULT debug $ENABLE_DEBUG_LOG_LEVEL
+    iniset $TACKER_CONF DEFAULT policy_file $TACKER_POLICY_FILE
+
+    iniset $TACKER_CONF DEFAULT auth_strategy $TACKER_AUTH_STRATEGY
+    _tacker_setup_keystone $TACKER_CONF keystone_authtoken
+
+    if [[ "${TACKER_MODE}" == "all" ]]; then
+        iniset "/$Q_PLUGIN_CONF_FILE" ml2 extension_drivers port_security
+        iniset "/$Q_PLUGIN_CONF_FILE" ml2_type_flat flat_networks $PUBLIC_PHYSICAL_NETWORK,$MGMT_PHYS_NET
+        iniset "/$Q_PLUGIN_CONF_FILE" ovs bridge_mappings $PUBLIC_PHYSICAL_NETWORK:$PUBLIC_BRIDGE,$MGMT_PHYS_NET:$BR_MGMT
+
+        # Experimental settings for monitor alarm auth settings,
+        # Will be changed according to new implementation.
+        iniset $TACKER_CONF alarm_auth username admin
+        iniset $TACKER_CONF alarm_auth password "$ADMIN_PASSWORD"
+        iniset $TACKER_CONF alarm_auth project_name admin
+        iniset $TACKER_CONF alarm_auth url http://$SERVICE_HOST:5000/v3
+
+        echo "Creating bridge"
+        sudo ovs-vsctl --may-exist add-br ${BR_MGMT}
+    fi
+    if [[ "${USE_BARBICAN}" == "True" ]]; then
+         iniset $TACKER_CONF vim_keys use_barbican True
+    fi
+    _tacker_setup_rootwrap
+}
+
+# Utility Functions
+#------------------
+
+# _tacker_deploy_rootwrap_filters() - deploy rootwrap filters to $TACKER_CONF_ROOTWRAP_D (owned by root).
+function _tacker_deploy_rootwrap_filters {
+    local srcdir=$1
+    sudo install -d -o root -m 755 $TACKER_CONF_ROOTWRAP_D
+    sudo install -o root -m 644 $srcdir/etc/tacker/rootwrap.d/* $TACKER_CONF_ROOTWRAP_D/
+}
+
+# _tacker_setup_rootwrap() - configure Tacker's rootwrap
+function _tacker_setup_rootwrap {
+    if [[ "$TACKER_USE_ROOTWRAP" == "False" ]]; then
+        return
+    fi
+    # Wipe any existing ``rootwrap.d`` files first
+    TACKER_CONF_ROOTWRAP_D=$TACKER_CONF_DIR/rootwrap.d
+    if [[ -d $TACKER_CONF_ROOTWRAP_D ]]; then
+        sudo rm -rf $TACKER_CONF_ROOTWRAP_D
+    fi
+
+    _tacker_deploy_rootwrap_filters $TACKER_DIR
+
+    sudo install -o root -g root -m 644 $TACKER_DIR/etc/tacker/rootwrap.conf $TACKER_RR_CONF_FILE
+    sudo sed -e "s:^filters_path=.*$:filters_path=$TACKER_CONF_ROOTWRAP_D:" -i $TACKER_RR_CONF_FILE
+    # Specify ``rootwrap.conf`` as first parameter to tacker-rootwrap
+    ROOTWRAP_SUDOER_CMD="$TACKER_ROOTWRAP $TACKER_RR_CONF_FILE *"
+
+    # Set up the rootwrap sudoers for tacker
+    TEMPFILE=`mktemp`
+    echo "$STACK_USER ALL=(root) NOPASSWD: $ROOTWRAP_SUDOER_CMD" >$TEMPFILE
+    chmod 0440 $TEMPFILE
+    sudo chown root:root $TEMPFILE
+    sudo mv $TEMPFILE /etc/sudoers.d/tacker-rootwrap
+
+    # Update the root_helper
+    iniset $TACKER_CONF agent root_helper "$TACKER_RR_COMMAND"
+}
+
+# Configures keystone integration for tacker service and agents
+function _tacker_setup_keystone {
+    local conf_file=$1
+    local section=$2
+    local use_auth_url=$3
+
+    # Configures keystone for metadata_agent
+    # metadata_agent needs auth_url to communicate with keystone
+    if [[ "$use_auth_url" == "True" ]]; then
+        iniset $conf_file $section auth_url $KEYSTONE_SERVICE_URI/v2.0
+    fi
+
+    create_tacker_cache_dir
+    configure_auth_token_middleware $conf_file $TACKER_ADMIN_USERNAME $TACKER_AUTH_CACHE_DIR $section
+}
+
+function tacker_horizon_install {
+    git_clone_by_name "tacker-horizon"
+    setup_dev_lib "tacker-horizon"
+    sudo cp $DEST/tacker-horizon/tacker_horizon/enabled/* $DEST/horizon/openstack_dashboard/enabled/
+    # make sure NFV's dashboard static files get loaded when deploying
+    $DEST/tacker-horizon/manage.py collectstatic --noinput
+    echo yes | $DEST/tacker-horizon/manage.py compress
+    restart_apache_server
+}
+
+function tacker_horizon_uninstall {
+    sudo rm -f  $DEST/horizon/openstack_dashboard/enabled/_80_nfv.py
+    restart_apache_server
+}
+
+function openstack_image_create {
+    image=$1
+    disk_format=raw
+    container_format=bare
+    image_name=$2
+    openstack --os-cloud=devstack-admin image create $image_name --public --container-format=$container_format --disk-format $disk_format --file ${image}
+    openstack image show $image_name -f value -c id
+}
+
+function tacker_check_and_download_images {
+    local image_url
+    image_url[0]='http://download.cirros-cloud.net/0.3.5/cirros-0.3.5-x86_64-disk.img'
+    # Customized image of OpenWRT 15.05.1 that can fix the continuously respawning OpenWRT-based VNFs
+    image_url[1]='https://anda.ssu.ac.kr/~openwrt/openwrt-x86-kvm_guest-combined-ext4.img.gz'
+
+    local image_fname image_name glance_name gz_pattern
+    local length=${#image_url[@]}
+    local index=0
+    while [ $index -lt $length ]
+    do
+        image_fname=`basename "${image_url[$index]}"`
+        glance_name=${image_fname%.*}
+        if [[ $glance_name =~ 'openwrt' ]]; then
+            glance_name='OpenWRT'
+        fi
+        image_name=`openstack image list | grep "$glance_name" | awk '{print $4}'`
+        if [[ $image_name == "" ]]; then
+            if [[ ! -f $FILES/$image_fname || "$(stat -c "%s" $FILES/$image_fname)" = "0" ]]; then
+                {
+                    wget --progress=dot:giga -c ${image_url[$index]} -O $FILES/$image_fname
+                    gz_pattern="\.gz$"
+                    if [[ $image_fname =~ $gz_pattern ]]; then
+                        new_image_fname=${image_fname%.*}
+                        gunzip -c $FILES/$image_fname > $FILES/$new_image_fname
+                        image_fname=$new_image_fname
+                    fi
+                }
+            fi
+            {
+                openstack_image_create $FILES/$image_fname $glance_name
+            }||{
+                echo "ERROR: tacker image create for $image_fname failed"
+                image_fname=$image_fname"*"
+                sudo rm -rf $FILES/$image_fname
+                exit 1
+            }
+        fi
+        index=$(($index+1))
+    done
+}
+
+function tacker_create_initial_network {
+    # create necessary networks
+    # prepare network
+    echo "Deleting networks"
+    for net in ${NET_MGMT} ${NET0} ${NET1}
+    do
+        for i in $(openstack network list | awk "/${net}/{print \$2}")
+        do
+            openstack network delete $i
+        done
+    done
+
+    echo "Creating networks"
+    NET_MGMT_ID=$(openstack network create --provider-network-type flat --provider-physical-network ${MGMT_PHYS_NET} --share ${NET_MGMT} | awk '/ id /{print $4}')
+    SUBNET_MGMT_ID=$(openstack subnet create ${SUBNET_MGMT} --ip-version 4 --gateway ${NETWORK_GATEWAY_MGMT} --network ${NET_MGMT_ID} --subnet-range ${FIXED_RANGE_MGMT} | awk '/ id /{print $4}')
+    NET0_ID=$(openstack network create --share ${NET0} | awk '/ id /{print $4}')
+    SUBNET0_ID=$(openstack subnet create ${SUBNET0} --ip-version 4 --gateway ${NETWORK_GATEWAY0} --network ${NET0_ID} --subnet-range ${FIXED_RANGE0} | awk '/ id /{print $4}')
+    NET1_ID=$(openstack network create --share ${NET1} | awk '/ id /{print $4}')
+    SUBNET1_ID=$(openstack subnet create ${SUBNET1} --ip-version 4 --gateway ${NETWORK_GATEWAY1} --network ${NET1_ID} --subnet-range ${FIXED_RANGE1} | awk '/ id /{print $4}')
+
+    echo "Assign ip address to BR_MGMT"
+    sudo ip link set ${BR_MGMT} up
+    sudo ip -4 address flush dev ${BR_MGMT}
+    sudo ip address add ${NETWORK_GATEWAY_MGMT_IP} dev ${BR_MGMT}
+}
+
+function tacker_register_default_vim {
+    # Note: These must be the same as in tacker/tests/etc/samples/local-vim.yaml
+    # and devstack/lib/tacker/vim_config.yaml
+    DEFAULT_VIM_PROJECT_NAME="nfv"
+    DEFAULT_VIM_USER="nfv_user"
+    DEFAULT_VIM_PASSWORD="devstack"
+
+    echo "Create NFV VIM project $DEFAULT_VIM_PROJECT_NAME ..."
+    get_or_create_project $DEFAULT_VIM_PROJECT_NAME
+    echo "Create NFV VIM user $DEFAULT_VIM_USER ..."
+    get_or_create_user $DEFAULT_VIM_USER $DEFAULT_VIM_PASSWORD
+    get_or_add_user_project_role admin $DEFAULT_VIM_USER $DEFAULT_VIM_PROJECT_NAME
+    # get_or_add_user_project_role advsvc $DEFAULT_VIM_USER $DEFAULT_VIM_PROJECT_NAME
+
+    echo "Set register default VIM sh which is called by ansible role..."
+    mkdir -p $DATA_DIR/tacker
+    cp $TACKER_DIR/devstack/vim_config.yaml $DATA_DIR/tacker
+    VIM_CONFIG_FILE="$DATA_DIR/tacker/vim_config.yaml"
+    sed -e "s|^auth_url:.*$|auth_url: \'${KEYSTONE_SERVICE_URI}\'|" -i $VIM_CONFIG_FILE
+    echo "The content of VIM config file $VIM_CONFIG_FILE :"
+    cat $VIM_CONFIG_FILE
+    DEFAULT_VIM_NAME="VIM0"
+    cat >> $TACKER_DIR/tools/test-setup-default-vim.sh <<EOF
+tacker --os-username nfv_user --os-project-name nfv --os-password devstack --os-auth-url ${KEYSTONE_SERVICE_URI} --os-project-domain-name Default --os-user-domain-name Default vim-register --is-default --description "Default VIM" --config-file $VIM_CONFIG_FILE $DEFAULT_VIM_NAME
+EOF
+    echo "The content of $TACKER_DIR/tools/test-setup-default-vim.sh"
+    cat $TACKER_DIR/tools/test-setup-default-vim.sh
+
+    echo "Update tacker/tests/etc/samples/local-vim.yaml for functional testing"
+    functional_vim_file="$TACKER_DIR/tacker/tests/etc/samples/local-vim.yaml"
+    sed -e "s|^auth_url:.*$|auth_url: \'${KEYSTONE_SERVICE_URI}\'|" -i $functional_vim_file
+    echo "The content of functional VIM config file $functional_vim_file :"
+    cat $functional_vim_file
+
+    echo "Set up target openstack vim resources ..."
+    openstack --os-cloud=devstack-admin quota set \
+              --class --instances -1 --cores -1 --ram -1 default
+    openstack --os-cloud=devstack-admin \
+              quota set --ports -1 $DEFAULT_VIM_PROJECT_NAME
+
+    openstack --os-region-name $REGION_NAME --os-project-name $DEFAULT_VIM_PROJECT_NAME \
+              --os-user-domain-id default --os-username $DEFAULT_VIM_USER \
+              --os-project-domain-id default --os-auth-url $KEYSTONE_SERVICE_URI \
+              --os-password $DEFAULT_VIM_PASSWORD keypair create userKey
+
+    openstack --os-region-name $REGION_NAME --os-project-name $DEFAULT_VIM_PROJECT_NAME \
+          --os-user-domain-id default --os-username $DEFAULT_VIM_USER \
+          --os-project-domain-id default --os-auth-url $KEYSTONE_SERVICE_URI \
+          --os-password $DEFAULT_VIM_PASSWORD \
+          security group create \
+          --description "tacker functest security group" test_secgrp
+
+    openstack --os-region-name $REGION_NAME --os-project-name $DEFAULT_VIM_PROJECT_NAME \
+          --os-user-domain-id default --os-username $DEFAULT_VIM_USER \
+          --os-project-domain-id default --os-auth-url $KEYSTONE_SERVICE_URI \
+          --os-password $DEFAULT_VIM_PASSWORD \
+          security group rule create \
+          --ingress --protocol icmp test_secgrp
+    openstack --os-region-name $REGION_NAME --os-project-name $DEFAULT_VIM_PROJECT_NAME \
+          --os-user-domain-id default --os-username $DEFAULT_VIM_USER \
+          --os-project-domain-id default --os-auth-url $KEYSTONE_SERVICE_URI \
+          --os-password $DEFAULT_VIM_PASSWORD \
+          security group rule create \
+          --ingress --protocol tcp --dst-port 22 test_secgrp
+
+}
+
+function modify_heat_flavor_policy_rule {
+    local policy_file=$HEAT_CONF_DIR/policy.yaml
+    touch $policy_file
+    # Allow non-admin projects with 'admin' roles to create flavors in Heat
+    echo '"resource_types:OS::Nova::Flavor": "role:admin"' >> $policy_file
+}
